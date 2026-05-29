@@ -35,6 +35,18 @@ function pickAudioUrl(data: N8nPayload): string | null {
   return null;
 }
 
+function pickAudioBase64Raw(data: N8nPayload): string | null {
+  const keys = ["audio_base64", "audioBase64", "audio", "data"];
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value !== "string" || !value.trim()) continue;
+    const cleaned = value.replace(/^data:audio\/[^;]+;base64,/, "").trim();
+    if (cleaned.length < 32) continue;
+    return cleaned;
+  }
+  return null;
+}
+
 function pickAudioBase64(data: N8nPayload): Buffer | null {
   const keys = ["audio_base64", "audioBase64", "audio", "data"];
   for (const key of keys) {
@@ -138,6 +150,30 @@ export async function POST(req: NextRequest) {
       }
 
       const data = unwrapN8nPayload(parsed);
+
+      // Si viene ruta u obstáculos, devolver JSON completo para que el cliente
+      // pueda dibujar la ruta y/o reproducir el audio base64.
+      const hasRoute = data.ruta != null;
+      const hasObstacles = data.obstaculos != null;
+
+      if (hasRoute || hasObstacles) {
+        const audioBase64Raw = pickAudioBase64Raw(data);
+        const text =
+          pickText(data) ??
+          (typeof data.respuesta_texto === "string"
+            ? data.respuesta_texto
+            : null);
+        const mimeType =
+          typeof data.mime_type === "string" ? data.mime_type : "audio/mpeg";
+
+        return NextResponse.json({
+          ok: true,
+          respuesta_texto: text ?? "",
+          ...(audioBase64Raw ? { audio_base64: audioBase64Raw, mime_type: mimeType } : {}),
+          ...(hasRoute ? { ruta: data.ruta } : {}),
+          ...(hasObstacles ? { obstaculos: data.obstaculos } : {}),
+        });
+      }
 
       const audioBase64 = pickAudioBase64(data);
       if (audioBase64 && audioBase64.length > 0) {

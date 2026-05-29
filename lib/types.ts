@@ -88,3 +88,30 @@ export type RouteState = {
   barriersOnRoute: ReportRecord[];
   mode: RouteMode;
 };
+
+export type VoiceRouteObstacle = {
+  descripcion?: string;
+  tipo?: string;
+  latitude: number;
+  longitude: number;
+  distancia_metros?: number;
+};
+
+export type VoiceRouteData = {
+  destino: string;
+  origen_lat: number;
+  origen_lng: number;
+  obstaculos?: VoiceRouteObstacle[];
+};
+
+export type N8nVoiceResponse = {
+  ok?: boolean;
+  respuesta_texto?: string;
+  audio_base64?: string;
+  mime_type?: string;
+  file_name?: string;
+  ruta?: VoiceRouteData;
+  obstaculos?: VoiceRouteObstacle[];
+  text?: string;
+  error?: string;
+};

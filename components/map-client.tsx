@@ -24,7 +24,9 @@ import type {
   ReportSubmitPayload,
   RouteFoundData,
   RouteMode,
-  RouteState
+  RouteState,
+  VoiceRouteData,
+  VoiceRouteObstacle
 } from "@/lib/types";
 
 // Buffer en metros para detección punto-a-segmento.
@@ -210,6 +212,64 @@ export function MapClient() {
     [addReport, pendingReport]
   );
 
+  const handleVoiceRoute = useCallback(async (ruta: VoiceRouteData) => {
+    if (!ruta.destino) return;
+
+    // Geocodificar el nombre de destino con Nominatim (OSM, sin API key)
+    let destLat: number | null = null;
+    let destLng: number | null = null;
+
+    try {
+      const query = encodeURIComponent(
+        `${ruta.destino}, Tijuana, Baja California, Mexico`
+      );
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
+        { headers: { "Accept-Language": "es" } }
+      );
+      const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
+      if (geoData.length > 0) {
+        destLat = parseFloat(geoData[0].lat);
+        destLng = parseFloat(geoData[0].lon);
+      }
+    } catch {
+      console.warn("[handleVoiceRoute] Geocodificación fallida para:", ruta.destino);
+    }
+
+    if (destLat === null || destLng === null) {
+      console.warn("[handleVoiceRoute] No se pudo geocodificar:", ruta.destino);
+      return;
+    }
+
+    // Registrar la ruta para que el cambio de modo (fastest/safest) la redibuje
+    lastRouteRef.current = { lat: destLat, lng: destLng, label: ruta.destino };
+
+    // Actualizar sidebar inmediatamente con el destino
+    setRouteState((prev) => ({
+      ...prev,
+      destination: ruta.destino,
+      distance: null,
+      duration: null,
+      barriersOnRoute: [],
+      warning: null,
+      mode: routeMode
+    }));
+
+    // Dibujar usando el mismo sistema existente (OSRM, modo actual, onRouteFound)
+    mapRef.current?.drawRoute(destLat, destLng, ruta.destino);
+
+    // Pintar obstáculos de voz encima de la ruta
+    if (ruta.obstaculos && ruta.obstaculos.length > 0) {
+      setTimeout(() => {
+        mapRef.current?.paintVoiceObstacles(ruta.obstaculos!);
+      }, 400);
+    }
+  }, [routeMode]);
+
+  const handleVoiceObstacles = useCallback((obstaculos: VoiceRouteObstacle[]) => {
+    mapRef.current?.paintVoiceObstacles(obstaculos);
+  }, []);
+
   return (
     <div className="app-shell">
       <AppHeader gpsStatus={gpsStatus} profile={profile} />
@@ -274,6 +334,8 @@ export function MapClient() {
             userLat={userPosition[0]}
             userLng={userPosition[1]}
             gpsReady={gpsReady}
+            onRouteReceived={handleVoiceRoute}
+            onObstaclesReceived={handleVoiceObstacles}
           />
         </div>
       </div>

@@ -803,6 +803,30 @@ body {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
+/* Marcadores de obstáculos de ruta segura (voz) */
+.voice-obstacle-marker {
+  background: transparent;
+  border: none;
+}
+
+.voice-obstacle-pin {
+  width: 34px;
+  height: 34px;
+  background: #fef3c7;
+  border: 2.5px solid #f59e0b;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  animation: voice-obstacle-pulse 2s infinite;
+}
+
+@keyframes voice-obstacle-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(245,158,11,.45); }
+  50%       { transform: scale(1.12); box-shadow: 0 6px 20px rgba(245,158,11,.65); }
+}
+
 /* ── Fase 1: perfil de accesibilidad ── */
 
 .navbar-right {

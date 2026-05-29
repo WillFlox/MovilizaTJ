@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { N8nVoiceResponse, VoiceRouteData, VoiceRouteObstacle } from "@/lib/types";
 
 type ChatState = "idle" | "recording" | "processing" | "speaking" | "error";
 
@@ -14,6 +15,8 @@ type VoiceChatbotProps = {
   userLat: number;
   userLng: number;
   gpsReady: boolean;
+  onRouteReceived?: (ruta: VoiceRouteData) => void;
+  onObstaclesReceived?: (obstaculos: VoiceRouteObstacle[]) => void;
 };
 
 function formatTime(s: number) {
@@ -29,7 +32,13 @@ function speakText(text: string) {
   window.speechSynthesis.speak(utter);
 }
 
-export function VoiceChatbot({ userLat, userLng, gpsReady }: VoiceChatbotProps) {
+export function VoiceChatbot({
+  userLat,
+  userLng,
+  gpsReady,
+  onRouteReceived,
+  onObstaclesReceived,
+}: VoiceChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [chatState, setChatState] = useState<ChatState>("idle");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -115,21 +124,70 @@ export function VoiceChatbot({ userLat, userLng, gpsReady }: VoiceChatbotProps) 
           addMessage("assistant", "🔊 Respuesta de voz reproducida.");
           await audio.play();
         } else {
-          const data = await res.json() as { text?: string; error?: string };
+          const data = await res.json() as N8nVoiceResponse;
 
           if (data.error) throw new Error(data.error);
 
-          const text = data.text ?? "No se obtuvo respuesta.";
-          addMessage("assistant", text);
+          // Respuesta enriquecida con ruta y/o audio_base64
+          if (data.ruta || data.obstaculos) {
+            const text = data.respuesta_texto ?? data.text ?? "Ruta lista.";
+            addMessage("assistant", text);
 
-          // Fallback TTS con el navegador
-          setChatState("speaking");
-          announce("Reproduciendo respuesta del asistente.");
-          speakText(text);
+            // Dibujar ruta en el mapa
+            if (data.ruta) {
+              onRouteReceived?.(data.ruta);
+            } else if (data.obstaculos) {
+              onObstaclesReceived?.(data.obstaculos);
+            }
 
-          // Estimamos duración: ~15 chars/segundo en voz normal
-          const duration = Math.max(2000, (text.length / 15) * 1000);
-          setTimeout(() => setChatState("idle"), duration);
+            // Reproducir audio si viene en base64
+            if (data.audio_base64) {
+              try {
+                const mime = data.mime_type ?? "audio/mpeg";
+                const audioSrc = `data:${mime};base64,${data.audio_base64}`;
+                const audio = new Audio(audioSrc);
+                audioRef.current = audio;
+
+                setChatState("speaking");
+                announce("Reproduciendo respuesta del asistente.");
+
+                audio.onended = () => {
+                  audioRef.current = null;
+                  setChatState("idle");
+                };
+                audio.onerror = () => {
+                  audioRef.current = null;
+                  setChatState("idle");
+                };
+
+                await audio.play();
+              } catch {
+                // Fallback TTS si el audio base64 falla
+                setChatState("speaking");
+                speakText(data.respuesta_texto ?? data.text ?? "");
+                const duration = Math.max(2000, ((data.respuesta_texto ?? "").length / 15) * 1000);
+                setTimeout(() => setChatState("idle"), duration);
+              }
+            } else {
+              // Sin audio: TTS de navegador
+              setChatState("speaking");
+              announce("Reproduciendo respuesta del asistente.");
+              speakText(text);
+              const duration = Math.max(2000, (text.length / 15) * 1000);
+              setTimeout(() => setChatState("idle"), duration);
+            }
+          } else {
+            // Respuesta de texto simple (sin ruta)
+            const text = data.text ?? data.respuesta_texto ?? "No se obtuvo respuesta.";
+            addMessage("assistant", text);
+
+            setChatState("speaking");
+            announce("Reproduciendo respuesta del asistente.");
+            speakText(text);
+
+            const duration = Math.max(2000, (text.length / 15) * 1000);
+            setTimeout(() => setChatState("idle"), duration);
+          }
         }
       } catch (err) {
         const msg =
@@ -139,7 +197,7 @@ export function VoiceChatbot({ userLat, userLng, gpsReady }: VoiceChatbotProps) 
         announce(`Error: ${msg}`);
       }
     },
-    [userLat, userLng, addMessage, announce]
+    [userLat, userLng, addMessage, announce, onRouteReceived, onObstaclesReceived]
   );
 
   const startRecording = useCallback(async () => {

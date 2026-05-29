@@ -10,7 +10,7 @@ import {
 import { BARRIER_ICONS, TIJUANA_CENTER } from "@/lib/constants";
 import type { LeafletLike, MapViewHandle } from "@/lib/leaflet-types";
 import { syncUserLocation } from "@/lib/api-client";
-import type { ReportRecord } from "@/lib/types";
+import type { ReportRecord, VoiceRouteObstacle } from "@/lib/types";
 import type { RouteFoundData, RouteMode } from "@/lib/types";
 import type {
   Control,
@@ -68,6 +68,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     const routeControlRef = useRef<RoutingControl | null>(null);
     const coverageCircleRef = useRef<L.Circle | null>(null);
     const barriersLayerRef = useRef<LayerGroup | null>(null);
+    const voiceObstaclesLayerRef = useRef<LayerGroup | null>(null);
     const userPositionRef = useRef<[number, number]>(TIJUANA_CENTER);
     const watchIdRef = useRef<number | null>(null);
 
@@ -143,7 +144,55 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           destMarkerRef.current.remove();
           destMarkerRef.current = null;
         }
-      }
+      },
+
+      clearVoiceOverlay() {
+        if (voiceObstaclesLayerRef.current) {
+          voiceObstaclesLayerRef.current.clearLayers();
+        }
+      },
+
+      paintVoiceObstacles(obstaculos: VoiceRouteObstacle[]) {
+        const map = mapInstanceRef.current;
+        const L = leafletRef.current;
+        if (!map || !L || !Array.isArray(obstaculos)) return;
+
+        if (!voiceObstaclesLayerRef.current) {
+          voiceObstaclesLayerRef.current = L.layerGroup().addTo(map);
+        } else {
+          voiceObstaclesLayerRef.current.clearLayers();
+        }
+
+        obstaculos.forEach((obs) => {
+          if (!obs.latitude || !obs.longitude) return;
+
+          const tipo = obs.tipo
+            ? String(obs.tipo).replace(/_/g, " ")
+            : "Sin tipo";
+          const distancia = obs.distancia_metros
+            ? `${obs.distancia_metros} metros`
+            : "Distancia no disponible";
+
+          const icon = L.divIcon({
+            className: "voice-obstacle-marker",
+            html: `<div class="voice-obstacle-pin">⚠️</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          });
+
+          L.marker([Number(obs.latitude), Number(obs.longitude)], { icon })
+            .bindPopup(
+              `<div style="min-width:160px">
+                <strong>Obstáculo reportado</strong><br>
+                ${obs.descripcion ?? "Sin descripción"}<br>
+                <span style="color:#ef4444;font-size:11px">Tipo: ${tipo}</span><br>
+                <span style="font-size:11px">Distancia: ${distancia}</span>
+              </div>`
+            )
+            .addTo(voiceObstaclesLayerRef.current!);
+        });
+      },
+
     }));
 
     // Re-dibuja marcadores cuando cambian reportes o cuando el mapa está listo.
@@ -318,6 +367,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         userMarkerRef.current = null;
         destMarkerRef.current = null;
         barriersLayerRef.current = null;
+        voiceObstaclesLayerRef.current = null;
         routeControlRef.current = null;
         setMapReady(false);
       };

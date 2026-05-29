@@ -99,6 +99,8 @@ export type VoiceRouteData = {
   destino: string;
   origen_lat: number;
   origen_lng: number;
+  destino_lat?: number;
+  destino_lng?: number;
   obstaculos?: VoiceRouteObstacle[];
 };
 

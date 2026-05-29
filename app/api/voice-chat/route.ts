@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractVoiceObstacles, extractVoiceRoute } from "@/lib/voice-route";
 
 export const maxDuration = 60;
 
@@ -78,6 +79,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData = await req.formData();
+    const userLat = Number(formData.get("latitude"));
+    const userLng = Number(formData.get("longitude"));
+    const geoContext = {
+      latitude: Number.isFinite(userLat) ? userLat : undefined,
+      longitude: Number.isFinite(userLng) ? userLng : undefined,
+    };
 
     const n8nRes = await fetch(VOICE_WEBHOOK_URL, {
       method: "POST",
@@ -153,10 +160,11 @@ export async function POST(req: NextRequest) {
 
       // Si viene ruta u obstáculos, devolver JSON completo para que el cliente
       // pueda dibujar la ruta y/o reproducir el audio base64.
-      const hasRoute = data.ruta != null;
-      const hasObstacles = data.obstaculos != null;
+      const ruta = extractVoiceRoute(data, geoContext);
+      const obstaculos = extractVoiceObstacles(data);
+      const hasObstacles = !!obstaculos?.length;
 
-      if (hasRoute || hasObstacles) {
+      if (ruta || hasObstacles) {
         const audioBase64Raw = pickAudioBase64Raw(data);
         const text =
           pickText(data) ??
@@ -170,13 +178,16 @@ export async function POST(req: NextRequest) {
           ok: true,
           respuesta_texto: text ?? "",
           ...(audioBase64Raw ? { audio_base64: audioBase64Raw, mime_type: mimeType } : {}),
-          ...(hasRoute ? { ruta: data.ruta } : {}),
-          ...(hasObstacles ? { obstaculos: data.obstaculos } : {}),
+          ...(ruta ? { ruta } : {}),
+          ...(hasObstacles ? { obstaculos } : {}),
         });
       }
 
       const audioBase64 = pickAudioBase64(data);
       if (audioBase64 && audioBase64.length > 0) {
+        console.warn(
+          "[voice-chat] Respuesta con audio pero sin campo `ruta`; el mapa no trazará ruta."
+        );
         return new NextResponse(audioBase64.buffer as ArrayBuffer, {
           status: 200,
           headers: {

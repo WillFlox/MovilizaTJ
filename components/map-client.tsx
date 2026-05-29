@@ -226,29 +226,34 @@ export function MapClient() {
   const handleVoiceRoute = useCallback(async (ruta: VoiceRouteData) => {
     if (!ruta.destino) return;
 
-    // Geocodificar el nombre de destino con Nominatim (OSM, sin API key)
-    let destLat: number | null = null;
-    let destLng: number | null = null;
+    let destLat: number | null = ruta.destino_lat ?? null;
+    let destLng: number | null = ruta.destino_lng ?? null;
 
-    try {
-      const query = encodeURIComponent(
-        `${ruta.destino}, Tijuana, Baja California, Mexico`
-      );
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
-        { headers: { "Accept-Language": "es" } }
-      );
-      const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
-      if (geoData.length > 0) {
-        destLat = parseFloat(geoData[0].lat);
-        destLng = parseFloat(geoData[0].lon);
+    if (destLat === null || destLng === null) {
+      try {
+        const geoRes = await fetch(
+          `/api/geocode?q=${encodeURIComponent(ruta.destino)}`
+        );
+        if (geoRes.ok) {
+          const geo = (await geoRes.json()) as { lat: number; lng: number };
+          destLat = geo.lat;
+          destLng = geo.lng;
+        } else {
+          console.warn(
+            "[handleVoiceRoute] Geocodificación fallida:",
+            ruta.destino,
+            await geoRes.text()
+          );
+        }
+      } catch {
+        console.warn("[handleVoiceRoute] Geocodificación fallida para:", ruta.destino);
       }
-    } catch {
-      console.warn("[handleVoiceRoute] Geocodificación fallida para:", ruta.destino);
     }
 
     if (destLat === null || destLng === null) {
-      console.warn("[handleVoiceRoute] No se pudo geocodificar:", ruta.destino);
+      window.alert(
+        `No pude ubicar «${ruta.destino}» en el mapa. Prueba con un nombre más específico o búscalo en la barra superior.`
+      );
       return;
     }
 

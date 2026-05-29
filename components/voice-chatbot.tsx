@@ -121,7 +121,10 @@ export function VoiceChatbot({
             setChatState("idle");
           };
 
-          addMessage("assistant", "🔊 Respuesta de voz reproducida.");
+          addMessage(
+            "assistant",
+            "🔊 Respuesta de voz reproducida. (El servidor no envió datos de ruta para dibujar en el mapa.)"
+          );
           await audio.play();
         } else {
           const data = await res.json() as N8nVoiceResponse;
@@ -179,7 +182,10 @@ export function VoiceChatbot({
           } else {
             // Respuesta de texto simple (sin ruta)
             const text = data.text ?? data.respuesta_texto ?? "No se obtuvo respuesta.";
-            addMessage("assistant", text);
+            addMessage(
+              "assistant",
+              `${text}\n\n(No se recibió el objeto «ruta» desde n8n; no se dibujó nada en el mapa.)`
+            );
 
             setChatState("speaking");
             announce("Reproduciendo respuesta del asistente.");

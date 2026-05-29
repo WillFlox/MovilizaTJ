@@ -28,6 +28,11 @@ export function useReports() {
     );
   }, []);
 
+  // Elimina un reporte del estado local (cuando pasa a resuelto/rechazado)
+  const removeReport = useCallback((id: string) => {
+    setReports((current) => current.filter((r) => r.id !== id));
+  }, []);
+
   useEffect(() => {
     loadReports().catch(() => setLoading(false));
   }, [loadReports]);
@@ -45,12 +50,28 @@ export function useReports() {
           addReport(payload.new as ReportRecord);
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "reportes" },
+        (payload) => {
+          const updated = payload.new as ReportRecord;
+          // Si el nuevo estado ya no es visible (resuelto/rechazado), quitar del mapa
+          if (updated.estado === "resuelto" || updated.estado === "rechazado") {
+            removeReport(updated.id);
+          } else {
+            // Actualizar en la lista (p. ej. pendiente → verificado)
+            setReports((current) =>
+              current.map((r) => (r.id === updated.id ? updated : r))
+            );
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [addReport]);
+  }, [addReport, removeReport]);
 
-  return { reports, loading, loadReports, addReport };
+  return { reports, loading, loadReports, addReport, removeReport };
 }

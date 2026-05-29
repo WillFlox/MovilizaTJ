@@ -8,8 +8,10 @@ import { ReportModal } from "@/components/report-modal";
 import { ReportDetailModal } from "@/components/report-detail-modal";
 import { CameraModal } from "@/components/camera-modal";
 import { VoiceChatbot } from "@/components/voice-chatbot";
+import { ProximityToast } from "@/components/proximity-toast";
 import { useReports } from "@/hooks/use-reports";
 import { useAccessibilityProfile } from "@/hooks/use-accessibility-profile";
+import { useProximityPrompt } from "@/hooks/use-proximity-prompt";
 import { submitReport } from "@/lib/api-client";
 import { distanceMeters, getBarriersOnRoute } from "@/lib/geo";
 import { TIJUANA_CENTER } from "@/lib/constants";
@@ -44,7 +46,7 @@ const EMPTY_ROUTE_STATE: RouteState = {
 
 export function MapClient() {
   const mapRef = useRef<MapViewHandle>(null);
-  const { reports, loading, addReport } = useReports();
+  const { reports, loading, addReport, removeReport } = useReports();
   const { profile, setProfile, getRouteWarning } = useAccessibilityProfile();
 
   const [userPosition, setUserPosition] =
@@ -62,8 +64,15 @@ export function MapClient() {
   const [nearbyRadius, setNearbyRadius] = useState(1500);
   const [selectedReport, setSelectedReport] = useState<ReportWithDistance | null>(null);
   const [gpsReady, setGpsReady] = useState(false);
+  const [toastResolving, setToastResolving] = useState(false);
 
   const lastRouteRef = useRef<{ lat: number; lng: number; label: string } | null>(null);
+
+  const { activePrompt, dismiss, resolve, confirmPresent } = useProximityPrompt(
+    reports,
+    userPosition,
+    gpsReady
+  );
 
   // Reportes filtrados por tipo/severidad — van al mapa completo
   const filteredReports = useMemo(() => {
@@ -289,6 +298,20 @@ export function MapClient() {
         <CameraModal
           onCapture={handleCameraCapture}
           onClose={handleCameraClose}
+        />
+      )}
+
+      {activePrompt && (
+        <ProximityToast
+          prompt={activePrompt}
+          resolving={toastResolving}
+          onResolved={async () => {
+            setToastResolving(true);
+            await resolve(activePrompt.report.id, userPosition[0], userPosition[1], removeReport);
+            setToastResolving(false);
+          }}
+          onStillPresent={() => confirmPresent(activePrompt.report.id)}
+          onDismiss={() => dismiss(activePrompt.report.id)}
         />
       )}
     </div>

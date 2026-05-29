@@ -26,7 +26,7 @@ export type LeafletLike = {
 import type { VoiceRouteObstacle } from "@/lib/types";
 
 export type MapViewHandle = {
-  drawRoute: (lat: number, lng: number, label?: string, avoidPoints?: [number, number][]) => void;
+  drawRoute: (lat: number, lng: number, label?: string, avoidPoints?: [number, number][], isTransportRoute?: boolean) => void;
   clearRoute: () => void;
   paintVoiceObstacles: (obstaculos: VoiceRouteObstacle[]) => void;
   clearVoiceOverlay: () => void;

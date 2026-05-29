@@ -72,7 +72,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     const [mapReady, setMapReady] = useState(false);
 
     useImperativeHandle(ref, () => ({
-      drawRoute(lat: number, lng: number, label?: string, avoidPoints?: [number, number][]) {
+      drawRoute(lat: number, lng: number, label?: string, avoidPoints?: [number, number][], isTransportRoute?: boolean) {
         const map = mapInstanceRef.current;
         const L = leafletRef.current;
         if (!map || !L) return;
@@ -134,7 +134,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         routeControlRef.current = control;
 
         const destIcon = L.icon({
-          iconUrl: "/pin.png",
+          iconUrl: isTransportRoute ? "/taxi.webp" : "/pin.png",
           iconSize: [48, 48],
           iconAnchor: [24, 48],
           popupAnchor: [0, -50]

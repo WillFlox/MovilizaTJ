@@ -102,6 +102,8 @@ export type VoiceRouteData = {
   destino_lat?: number;
   destino_lng?: number;
   obstaculos?: VoiceRouteObstacle[];
+  /** true cuando la respuesta proviene de una consulta de ruta de transporte público */
+  es_ruta_transporte?: boolean;
 };
 
 export type N8nVoiceResponse = {
@@ -114,4 +116,12 @@ export type N8nVoiceResponse = {
   obstaculos?: VoiceRouteObstacle[];
   text?: string;
   error?: string;
+  // Campos de debug reenviados desde n8n (útiles para depurar en móvil)
+  modo_consulta?: string;
+  ruta_generada?: boolean | string;
+  debug_ruta_motivo?: string;
+  mantener_ruta_actual?: boolean;
+  last_transport_route_id?: string | number;
+  last_transport_route_name?: string;
+  last_transport_destino?: string;
 };

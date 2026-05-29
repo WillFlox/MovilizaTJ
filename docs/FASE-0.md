@@ -1,5 +1,7 @@
 # Fase 0 — Consolidación ✅
 
+> Documento histórico. Para documentación actualizada ver [README.md](../README.md) y [docs/README.md](README.md).
+
 Checklist para dejar la base estable antes de Fase 1+.
 
 ## Código (completado en repo)

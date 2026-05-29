@@ -158,25 +158,40 @@ export async function POST(req: NextRequest) {
 
       const data = unwrapN8nPayload(parsed);
 
-      // ── DEBUG: muestra el payload completo de n8n en la consola del servidor ──
-      console.log("[voice-chat] payload de n8n:", JSON.stringify({
-        pide_ruta:    data.pide_ruta,
-        ruta:         data.ruta,
-        destino_ruta: data.destino_ruta,
-        modo_consulta:data.modo_consulta,
-        respuesta_texto: typeof data.respuesta_texto === "string"
-          ? data.respuesta_texto.slice(0, 80)
-          : undefined,
-        obstaculos_count: Array.isArray(data.reportes_encontrados)
-          ? data.reportes_encontrados.length
-          : 0,
-      }, null, 2));
+      // ── DEBUG: payload completo de n8n en consola del servidor ──
+      console.log("[voice-chat] RAW n8n payload keys:", Object.keys(data));
+      console.log("[voice-chat] modo_consulta:", data.modo_consulta);
+      console.log("[voice-chat] ruta_generada:", data.ruta_generada);
+      console.log("[voice-chat] ruta (tipo):", typeof data.ruta, "| valor:", JSON.stringify(data.ruta)?.slice(0, 200));
+      console.log("[voice-chat] debug_ruta_motivo:", data.debug_ruta_motivo);
+      console.log("[voice-chat] mantener_ruta_actual:", data.mantener_ruta_actual);
+      console.log("[voice-chat] last_transport_route_id:", data.last_transport_route_id);
+      console.log("[voice-chat] last_transport_route_name:", data.last_transport_route_name);
+      console.log("[voice-chat] last_transport_destino:", data.last_transport_destino);
+      console.log("[voice-chat] pide_ruta:", data.pide_ruta, "| destino_ruta:", data.destino_ruta);
+      console.log("[voice-chat] respuesta_texto:", typeof data.respuesta_texto === "string"
+        ? data.respuesta_texto.slice(0, 120)
+        : data.respuesta_texto);
 
       // Si viene ruta u obstáculos, devolver JSON completo para que el cliente
       // pueda dibujar la ruta y/o reproducir el audio base64.
       const ruta = extractVoiceRoute(data, geoContext);
       const obstaculos = extractVoiceObstacles(data);
       const hasObstacles = !!obstaculos?.length;
+
+      console.log("[voice-chat] extractVoiceRoute resultado:", JSON.stringify(ruta)?.slice(0, 300) ?? "null");
+      console.log("[voice-chat] hasObstacles:", hasObstacles, "| count:", obstaculos?.length ?? 0);
+
+      // Campos de debug que se reenvían al cliente para inspección en móvil
+      const debugFields = {
+        modo_consulta:            data.modo_consulta,
+        ruta_generada:            data.ruta_generada,
+        debug_ruta_motivo:        data.debug_ruta_motivo,
+        mantener_ruta_actual:     data.mantener_ruta_actual,
+        last_transport_route_id:  data.last_transport_route_id,
+        last_transport_route_name:data.last_transport_route_name,
+        last_transport_destino:   data.last_transport_destino,
+      };
 
       if (ruta || hasObstacles) {
         const audioBase64Raw = pickAudioBase64Raw(data);
@@ -194,6 +209,7 @@ export async function POST(req: NextRequest) {
           ...(audioBase64Raw ? { audio_base64: audioBase64Raw, mime_type: mimeType } : {}),
           ...(ruta ? { ruta } : {}),
           ...(hasObstacles ? { obstaculos } : {}),
+          ...debugFields,
         });
       }
 
@@ -226,7 +242,7 @@ export async function POST(req: NextRequest) {
 
       const text = pickText(data);
       if (text) {
-        return NextResponse.json({ text });
+        return NextResponse.json({ text, ...debugFields });
       }
 
       console.error(

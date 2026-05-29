@@ -358,7 +358,7 @@ export function MapClient() {
 
     // Dibujar usando el mismo sistema existente (OSRM, modo actual, onRouteFound)
     const avoidPoints = buildAvoidPoints(destLat, destLng);
-    mapRef.current?.drawRoute(destLat, destLng, ruta.destino, avoidPoints);
+    mapRef.current?.drawRoute(destLat, destLng, ruta.destino, avoidPoints, ruta.es_ruta_transporte);
 
     // Pintar obstáculos de voz encima de la ruta
     if (ruta.obstaculos && ruta.obstaculos.length > 0) {

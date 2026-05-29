@@ -131,6 +131,17 @@ export function VoiceChatbot({
         } else {
           const data = await res.json() as N8nVoiceResponse;
 
+          // ── LOGS DE DEPURACIÓN (visibles en DevTools del móvil) ──
+          console.log("RESPUESTA N8N:", data);
+          console.log("modo_consulta:", data.modo_consulta);
+          console.log("ruta_generada:", data.ruta_generada);
+          console.log("ruta:", data.ruta);
+          console.log("debug_ruta_motivo:", data.debug_ruta_motivo);
+          console.log("mantener_ruta_actual:", data.mantener_ruta_actual);
+          console.log("last_transport_route_id:", data.last_transport_route_id);
+          console.log("last_transport_route_name:", data.last_transport_route_name);
+          console.log("last_transport_destino:", data.last_transport_destino);
+
           if (data.error) throw new Error(data.error);
 
           // Respuesta enriquecida con ruta y/o audio_base64

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppHeader } from "@/components/app-header";
+import Image from "next/image";
 import { AppSidebar, type ReportWithDistance } from "@/components/app-sidebar";
 import { MapView } from "@/components/map-view";
+import { PlacesSearch } from "@/components/places-search";
 import { ReportModal } from "@/components/report-modal";
 import { ReportDetailModal } from "@/components/report-detail-modal";
 import { CameraModal } from "@/components/camera-modal";
@@ -67,6 +68,7 @@ export function MapClient() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDistance | null>(null);
   const [gpsReady, setGpsReady] = useState(false);
   const [toastResolving, setToastResolving] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const lastRouteRef = useRef<{ lat: number; lng: number; label: string } | null>(null);
 
@@ -75,6 +77,15 @@ export function MapClient() {
     userPosition,
     gpsReady
   );
+
+  useEffect(() => {
+    if (!showSidebar) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showSidebar]);
 
   // Reportes filtrados por tipo/severidad — van al mapa completo
   const filteredReports = useMemo(() => {
@@ -271,74 +282,126 @@ export function MapClient() {
   }, []);
 
   return (
-    <div className="app-shell">
-      <AppHeader gpsStatus={gpsStatus} profile={profile} />
-
-      <div className="main-container">
-        <AppSidebar
-          allReports={reports}
-          nearbyReports={nearbyReports}
-          reportsLoading={loading}
-          userLat={userPosition[0]}
-          userLng={userPosition[1]}
-          nearbyRadius={nearbyRadius}
-          onRadiusChange={setNearbyRadius}
-          routeState={routeState}
-          profile={profile}
-          onProfileChange={setProfile}
-          onPlaceSelect={handlePlaceSelect}
-          onReportHint={() =>
-            window.alert(
-              "Haz clic en el mapa para reportar una barrera con foto y ubicación GPS."
-            )
-          }
-          onReportSelect={setSelectedReport}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onModeChange={handleModeChange}
-          onClearRoute={handleClearRoute}
+    <div className="app-shell app-shell--map">
+      {/* Mapa fullscreen */}
+      <div className="map-wrapper-outer">
+        <MapView
+          ref={mapRef}
+          reports={filteredReports}
+          routeMode={routeMode}
+          onMapClick={handleMapClick}
+          onUserPositionChange={handleUserPositionChange}
+          onGpsStatusChange={setGpsStatus}
+          onRouteFound={handleRouteFound}
         />
 
-        <div className="map-wrapper-outer">
-          <MapView
-            ref={mapRef}
-            reports={filteredReports}
-            routeMode={routeMode}
-            onMapClick={handleMapClick}
-            onUserPositionChange={handleUserPositionChange}
-            onGpsStatusChange={setGpsStatus}
-            onRouteFound={handleRouteFound}
-          />
-
-          {/* FAB de reporte rápido con cámara */}
-          <div className="quick-report-fab-container">
-            <button
-              className="quick-report-fab"
-              onClick={handleQuickPhotoClick}
-              title={
-                gpsReady
-                  ? "Fotografiar incidente en mi ubicación"
-                  : "Esperando señal GPS…"
-              }
-              aria-label="Fotografiar incidente"
-            >
-              <span className="fab-icon">📸</span>
-              <span className="fab-label">
-                {gpsReady ? "Reportar con cámara" : "Buscando GPS…"}
-              </span>
-            </button>
-          </div>
-
-          {/* Asistente de voz */}
-          <VoiceChatbot
-            userLat={userPosition[0]}
-            userLng={userPosition[1]}
-            gpsReady={gpsReady}
-            onRouteReceived={handleVoiceRoute}
-            onObstaclesReceived={handleVoiceObstacles}
+        {/* Logo — esquina superior izquierda */}
+        <div className="map-overlay-logo">
+          <Image
+            src="/logo.png"
+            alt="MovilizaTJ"
+            width={200}
+            height={52}
+            className="map-overlay-logo-img"
+            priority
           />
         </div>
+
+        {/* Barra de búsqueda — centro superior */}
+        <div className="map-overlay-search">
+          <div className="map-search-inner">
+            <PlacesSearch
+              userLat={userPosition[0]}
+              userLng={userPosition[1]}
+              onSelect={handlePlaceSelect}
+            />
+            <span className="map-search-icon">🔍</span>
+          </div>
+        </div>
+
+        {/* Botones de acción — esquina superior derecha */}
+        <div className="map-overlay-actions">
+          <button
+            className="map-action-btn"
+            onClick={() => setShowSidebar(true)}
+            title="Perfil de accesibilidad"
+            aria-label="Abrir perfil de accesibilidad"
+          >
+            ♿
+          </button>
+          <button
+            className="map-action-btn"
+            onClick={() => setShowSidebar(true)}
+            title="Menú"
+            aria-label="Abrir menú"
+          >
+            ☰
+          </button>
+        </div>
+
+        {/* FAB cámara — esquina inferior derecha */}
+        <div className="quick-report-fab-container">
+          <button
+            className="quick-report-fab"
+            onClick={handleQuickPhotoClick}
+            title={gpsReady ? "Fotografiar incidente" : "Esperando señal GPS…"}
+            aria-label="Fotografiar incidente"
+          >
+            <span className="fab-icon">📸</span>
+          </button>
+        </div>
+
+        {/* Asistente de voz — esquina inferior izquierda */}
+        <VoiceChatbot
+          userLat={userPosition[0]}
+          userLng={userPosition[1]}
+          gpsReady={gpsReady}
+          onRouteReceived={handleVoiceRoute}
+          onObstaclesReceived={handleVoiceObstacles}
+        />
       </div>
+
+      {/* Drawer lateral */}
+      {showSidebar && (
+        <>
+          <div
+            className="sidebar-drawer-overlay"
+            onClick={() => setShowSidebar(false)}
+          />
+          <div className="sidebar-drawer">
+            <div className="sidebar-drawer-header">
+              <span className="sidebar-drawer-title">MovilizaTJ</span>
+              <button
+                className="sidebar-drawer-close"
+                onClick={() => setShowSidebar(false)}
+                aria-label="Cerrar menú"
+              >
+                ✕
+              </button>
+            </div>
+            <AppSidebar
+              nearbyReports={nearbyReports}
+              reportsLoading={loading}
+              userLat={userPosition[0]}
+              userLng={userPosition[1]}
+              nearbyRadius={nearbyRadius}
+              onRadiusChange={setNearbyRadius}
+              routeState={routeState}
+              profile={profile}
+              onProfileChange={setProfile}
+              onPlaceSelect={handlePlaceSelect}
+              onReportSelect={(r) => {
+                setSelectedReport(r);
+                setShowSidebar(false);
+              }}
+              filters={filters}
+              onFiltersChange={setFilters}
+              onModeChange={handleModeChange}
+              onClearRoute={handleClearRoute}
+            />
+          </div>
+        </>
+      )}
 
       {pendingReport && (
         <ReportModal

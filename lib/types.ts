@@ -11,9 +11,7 @@ export type ReportStatus =
 export type ReportSeverity = "baja" | "media" | "alta";
 
 export type AccessibilityProfile =
-  | "silla_ruedas"
   | "movilidad_reducida"
-  | "carriola"
   | "discapacidad_visual";
 
 export type ReportRecord = {

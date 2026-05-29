@@ -2,9 +2,7 @@ import Image from "next/image";
 import type { AccessibilityProfileValue } from "@/lib/constants";
 
 const PROFILE_ICONS: Record<AccessibilityProfileValue, string> = {
-  silla_ruedas: "♿",
   movilidad_reducida: "🚶",
-  carriola: "🍼",
   discapacidad_visual: "👁️"
 };
 

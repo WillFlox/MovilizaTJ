@@ -11,9 +11,7 @@ type ProfileSelectorProps = {
 };
 
 const PROFILE_ICONS: Record<AccessibilityProfileValue, string> = {
-  silla_ruedas: "♿",
   movilidad_reducida: "🚶",
-  carriola: "🍼",
   discapacidad_visual: "👁️"
 };
 

@@ -44,19 +44,9 @@ export const QUICK_DESTINATIONS = [
 
 export const ACCESSIBILITY_PROFILES = [
   {
-    value: "silla_ruedas",
-    label: "Silla de ruedas",
-    description: "Evita escalones, pendientes fuertes y banquetas rotas"
-  },
-  {
     value: "movilidad_reducida",
     label: "Movilidad reducida",
     description: "Prefiere tramos cortos, rampas y superficies firmes"
-  },
-  {
-    value: "carriola",
-    label: "Carriola / familias",
-    description: "Prioriza aceras amplias y cruces seguros"
   },
   {
     value: "discapacidad_visual",

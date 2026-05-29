@@ -49,7 +49,6 @@ function timeAgo(isoDate: string): string {
 }
 
 type AppSidebarProps = {
-  allReports: ReportRecord[];
   nearbyReports: ReportWithDistance[];
   reportsLoading: boolean;
   userLat: number;
@@ -60,7 +59,6 @@ type AppSidebarProps = {
   profile: AccessibilityProfileValue;
   onProfileChange: (value: AccessibilityProfileValue) => void;
   onPlaceSelect: (place: PlaceResult) => void;
-  onReportHint: () => void;
   onReportSelect: (report: ReportWithDistance) => void;
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
@@ -69,7 +67,6 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({
-  allReports,
   nearbyReports,
   reportsLoading,
   userLat,
@@ -80,170 +77,147 @@ export function AppSidebar({
   profile,
   onProfileChange,
   onPlaceSelect,
-  onReportHint,
   onReportSelect,
   filters,
   onFiltersChange,
   onModeChange,
   onClearRoute
 }: AppSidebarProps) {
-  const [statsExpanded, setStatsExpanded] = useState(false);
-
-  const alta  = allReports.filter((r) => r.severidad === "alta").length;
-  const media = allReports.filter((r) => r.severidad === "media").length;
-  const baja  = allReports.filter((r) => r.severidad === "baja").length;
+  const [nearbyExpanded, setNearbyExpanded] = useState(false);
 
   return (
-    <aside className="sidebar">
-      {/* ── Estadísticas globales (colapsable) ───── */}
-      <div className="sb-stats-panel">
-        <button
-          className="sb-stats-toggle"
-          onClick={() => setStatsExpanded((v) => !v)}
-        >
-          <span>
-            <strong>{reportsLoading ? "…" : allReports.length}</strong> incidencias activas en el mapa
-          </span>
-          <span className="sb-toggle-arrow">{statsExpanded ? "▲" : "▼"}</span>
-        </button>
+    <aside className="sidebar sidebar--gmaps">
+      <div className="sb-top sb-top--sticky">
+        {/* ── Perfil de movilidad ───────────────────── */}
+        <ProfileSelector value={profile} onChange={onProfileChange} />
 
-        {statsExpanded && (
-          <div className="sb-stats-grid">
-            <div className="sb-stat" style={{ borderColor: SEV_COLOR.alta }}>
-              <span className="sb-stat-num" style={{ color: SEV_COLOR.alta }}>
-                {reportsLoading ? "…" : alta}
-              </span>
-              <span className="sb-stat-lbl">Alta</span>
-            </div>
-            <div className="sb-stat" style={{ borderColor: SEV_COLOR.media }}>
-              <span className="sb-stat-num" style={{ color: SEV_COLOR.media }}>
-                {reportsLoading ? "…" : media}
-              </span>
-              <span className="sb-stat-lbl">Media</span>
-            </div>
-            <div className="sb-stat" style={{ borderColor: SEV_COLOR.baja }}>
-              <span className="sb-stat-num" style={{ color: SEV_COLOR.baja }}>
-                {reportsLoading ? "…" : baja}
-              </span>
-              <span className="sb-stat-lbl">Baja</span>
-            </div>
-            <div className="sb-stat" style={{ borderColor: "#2563eb" }}>
-              <span className="sb-stat-num" style={{ color: "#2563eb" }}>
-                {reportsLoading ? "…" : allReports.length}
-              </span>
-              <span className="sb-stat-lbl">Total</span>
-            </div>
-          </div>
-        )}
+        {/* ── Búsqueda de destino ───────────────────── */}
+        <div className="sb-search">
+          <PlacesSearch
+            userLat={userLat}
+            userLng={userLng}
+            onSelect={onPlaceSelect}
+          />
+        </div>
+
+        {/* ── Panel de ruta ─────────────────────────── */}
+        <RoutePanel
+          routeState={routeState}
+          onModeChange={onModeChange}
+          onClear={onClearRoute}
+        />
+
+        {/* ── Filtros ──────────────────────────────── */}
+        <FilterBar filters={filters} onChange={onFiltersChange} />
       </div>
 
-      {/* ── Perfil de movilidad ───────────────────── */}
-      <ProfileSelector value={profile} onChange={onProfileChange} />
-
-      {/* ── Búsqueda de destino ───────────────────── */}
-      <PlacesSearch
-        userLat={userLat}
-        userLng={userLng}
-        onSelect={onPlaceSelect}
-      />
-
-      {/* ── Panel de ruta ─────────────────────────── */}
-      <RoutePanel
-        routeState={routeState}
-        onModeChange={onModeChange}
-        onClear={onClearRoute}
-      />
-
-      {/* ── CTA reportar ─────────────────────────── */}
-      <button className="btn-report" onClick={onReportHint}>
-        📍 Reportar barrera en el mapa
-      </button>
-
-      {/* ── Filtros ──────────────────────────────── */}
-      <FilterBar filters={filters} onChange={onFiltersChange} />
-
-      {/* ── Incidencias cercanas ──────────────────── */}
-      <div className="sb-nearby">
-        <div className="sb-nearby-header">
-          <div>
+      {/* ── Incidencias cercanas (colapsable) ─────── */}
+      <div
+        className={`sb-nearby sb-nearby--gmaps${nearbyExpanded ? " sb-nearby--open" : ""}`}
+      >
+        <button
+          type="button"
+          className="sb-nearby-header sb-nearby-toggle"
+          onClick={() => setNearbyExpanded((v) => !v)}
+          aria-expanded={nearbyExpanded}
+          aria-controls="sb-nearby-panel"
+        >
+          <div className="sb-nearby-toggle-text">
             <div className="sb-nearby-title">Incidencias cercanas</div>
             <div className="sb-nearby-subtitle">
               Solo en el mapa se muestran todas
             </div>
           </div>
-          {nearbyReports.length > 0 && (
-            <span className="sb-nearby-count">{nearbyReports.length}</span>
-          )}
-        </div>
-
-        {/* Selector de radio */}
-        <div className="sb-radius-tabs">
-          {NEARBY_RADII.map((opt) => (
-            <button
-              key={opt.value}
-              className={`sb-radius-tab${nearbyRadius === opt.value ? " active" : ""}`}
-              onClick={() => onRadiusChange(opt.value)}
+          <div className="sb-nearby-toggle-meta">
+            {nearbyReports.length > 0 && (
+              <span className="sb-nearby-count">{nearbyReports.length}</span>
+            )}
+            <span
+              className="sb-nearby-chevron"
+              aria-hidden
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+              {nearbyExpanded ? "▲" : "▼"}
+            </span>
+          </div>
+        </button>
 
-        {/* Lista */}
-        <div className="sb-report-list">
-          {reportsLoading ? (
-            <div className="sb-empty">Cargando reportes…</div>
-          ) : nearbyReports.length === 0 ? (
-            <div className="sb-empty">
-              No hay incidencias dentro de{" "}
-              {formatDistance(nearbyRadius)}.
-            </div>
-          ) : (
-            nearbyReports.map((report) => {
-              const icon = BARRIER_ICONS[report.tipo] ?? "📍";
-              const barrierLabel =
-                BARRIER_TYPES.find((t) => t.value === report.tipo)?.label ??
-                report.tipo.replace(/_/g, " ");
-
-              return (
+        {nearbyExpanded && (
+          <div id="sb-nearby-panel" className="sb-nearby-panel">
+            <div className="sb-radius-tabs">
+              {NEARBY_RADII.map((opt) => (
                 <button
-                  key={report.id}
-                  className="sb-report-item"
-                  onClick={() => onReportSelect(report)}
-                  style={{ borderLeftColor: SEV_COLOR[report.severidad] ?? "#10b981" }}
+                  key={opt.value}
+                  type="button"
+                  className={`sb-radius-tab${nearbyRadius === opt.value ? " active" : ""}`}
+                  onClick={() => onRadiusChange(opt.value)}
                 >
-                  <div className="sb-ri-top">
-                    <span className="sb-ri-icon">{icon}</span>
-                    <span className="sb-ri-type">{barrierLabel}</span>
-                    <span
-                      className="sb-ri-sev"
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="sb-report-list">
+              {reportsLoading ? (
+                <div className="sb-empty">Cargando reportes…</div>
+              ) : nearbyReports.length === 0 ? (
+                <div className="sb-empty">
+                  No hay incidencias dentro de{" "}
+                  {formatDistance(nearbyRadius)}.
+                </div>
+              ) : (
+                nearbyReports.map((report) => {
+                  const icon = BARRIER_ICONS[report.tipo] ?? "📍";
+                  const barrierLabel =
+                    BARRIER_TYPES.find((t) => t.value === report.tipo)?.label ??
+                    report.tipo.replace(/_/g, " ");
+
+                  return (
+                    <button
+                      key={report.id}
+                      type="button"
+                      className="sb-report-item"
+                      onClick={() => onReportSelect(report)}
                       style={{
-                        background: SEV_BG[report.severidad],
-                        color: SEV_TEXT[report.severidad]
+                        borderLeftColor:
+                          SEV_COLOR[report.severidad] ?? "#10b981"
                       }}
                     >
-                      {report.severidad}
-                    </span>
-                  </div>
+                      <div className="sb-ri-top">
+                        <span className="sb-ri-icon">{icon}</span>
+                        <span className="sb-ri-type">{barrierLabel}</span>
+                        <span
+                          className="sb-ri-sev"
+                          style={{
+                            background: SEV_BG[report.severidad],
+                            color: SEV_TEXT[report.severidad]
+                          }}
+                        >
+                          {report.severidad}
+                        </span>
+                      </div>
 
-                  {report.descripcion && (
-                    <p className="sb-ri-desc">{report.descripcion}</p>
-                  )}
+                      {report.descripcion && (
+                        <p className="sb-ri-desc">{report.descripcion}</p>
+                      )}
 
-                  <div className="sb-ri-footer">
-                    <span className="sb-ri-dist">
-                      📍 {formatDistance(report.distance_m)}
-                    </span>
-                    <span className="sb-ri-time">{timeAgo(report.created_at)}</span>
-                    {report.foto_url && (
-                      <span className="sb-ri-photo-badge">📷 foto</span>
-                    )}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
+                      <div className="sb-ri-footer">
+                        <span className="sb-ri-dist">
+                          📍 {formatDistance(report.distance_m)}
+                        </span>
+                        <span className="sb-ri-time">
+                          {timeAgo(report.created_at)}
+                        </span>
+                        {report.foto_url && (
+                          <span className="sb-ri-photo-badge">📷 foto</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

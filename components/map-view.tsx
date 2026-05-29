@@ -101,7 +101,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
       if (barriersLayerRef.current) {
         barriersLayerRef.current.clearLayers();
       } else {
-        barriersLayerRef.current = L.layerGroup().addTo(map);
+        // Usamos markerClusterGroup si está disponible, fallback a layerGroup
+        barriersLayerRef.current = (L.markerClusterGroup
+          ? L.markerClusterGroup({
+              maxClusterRadius: 50,
+              showCoverageOnHover: false,
+              spiderfyOnMaxZoom: true
+            })
+          : L.layerGroup()
+        ).addTo(map);
       }
 
       props.reports.forEach((report) => {
@@ -171,6 +179,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
           { maxZoom: 20, subdomains: "abcd" }
         ).addTo(map);
+
+        // Cargamos leaflet.markercluster después de que Leaflet esté listo
+        await import("leaflet.markercluster");
 
         coverageCircleRef.current = L.circle(TIJUANA_CENTER, {
           radius: 1700,

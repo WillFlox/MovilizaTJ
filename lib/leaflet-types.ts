@@ -12,6 +12,8 @@ export type LeafletLike = {
   latLng: typeof import("leaflet").latLng;
   layerGroup: typeof import("leaflet").layerGroup;
   Routing: RoutingNamespace;
+  // markerClusterGroup viene de leaflet.markercluster
+  markerClusterGroup: (options?: object) => import("leaflet").LayerGroup;
 };
 
 export type MapViewHandle = {

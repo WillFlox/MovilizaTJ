@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import type { FilterState } from "@/components/filter-bar";
 import { MapView } from "@/components/map-view";
 import { ReportModal } from "@/components/report-modal";
 import { useReports } from "@/hooks/use-reports";
@@ -25,13 +26,26 @@ export function MapClient() {
   const [userPosition, setUserPosition] =
     useState<[number, number]>(TIJUANA_CENTER);
   const [gpsStatus, setGpsStatus] = useState("Buscando señal GPS...");
-  const [pendingReport, setPendingReport] = useState<PendingReport | null>(
-    null
-  );
+  const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
   const [routeState, setRouteState] = useState<RouteState>({
     warning: null,
     destination: null
   });
+  const [filters, setFilters] = useState<FilterState>({
+    tipos: [],
+    severidades: []
+  });
+
+  // Reportes filtrados — se usan tanto en el sidebar como en el mapa.
+  const filteredReports = useMemo(() => {
+    return reports.filter((r) => {
+      const tipoOk = filters.tipos.length === 0 || filters.tipos.includes(r.tipo);
+      const sevOk =
+        filters.severidades.length === 0 ||
+        filters.severidades.includes(r.severidad);
+      return tipoOk && sevOk;
+    });
+  }, [reports, filters]);
 
   const handleMapClick = useCallback(
     (latitude: number, longitude: number) => {
@@ -52,12 +66,9 @@ export function MapClient() {
     [getRouteWarning, reports]
   );
 
-  const handlePlaceSelect = useCallback(
-    (place: PlaceResult) => {
-      mapRef.current?.drawRoute(place.latitude, place.longitude, place.name);
-    },
-    []
-  );
+  const handlePlaceSelect = useCallback((place: PlaceResult) => {
+    mapRef.current?.drawRoute(place.latitude, place.longitude, place.name);
+  }, []);
 
   const handleReportSubmit = useCallback(
     async (payload: ReportSubmitPayload) => {
@@ -74,7 +85,8 @@ export function MapClient() {
 
       <div className="main-container">
         <AppSidebar
-          reports={reports}
+          reports={filteredReports}
+          allReports={reports}
           reportsLoading={loading}
           userLat={userPosition[0]}
           userLng={userPosition[1]}
@@ -87,11 +99,13 @@ export function MapClient() {
               "Haz clic en el mapa para reportar una barrera con foto y ubicación GPS."
             )
           }
+          filters={filters}
+          onFiltersChange={setFilters}
         />
 
         <MapView
           ref={mapRef}
-          reports={reports}
+          reports={filteredReports}
           onMapClick={handleMapClick}
           onUserPositionChange={setUserPosition}
           onGpsStatusChange={setGpsStatus}

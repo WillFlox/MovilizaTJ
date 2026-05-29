@@ -1,10 +1,12 @@
 import { PlacesSearch } from "@/components/places-search";
 import { ProfileSelector } from "@/components/profile-selector";
+import { FilterBar, type FilterState } from "@/components/filter-bar";
 import { BARRIER_ICONS, type AccessibilityProfileValue } from "@/lib/constants";
 import type { PlaceResult, ReportRecord, RouteState } from "@/lib/types";
 
 type AppSidebarProps = {
   reports: ReportRecord[];
+  allReports: ReportRecord[];
   reportsLoading: boolean;
   userLat: number;
   userLng: number;
@@ -13,10 +15,13 @@ type AppSidebarProps = {
   onProfileChange: (value: AccessibilityProfileValue) => void;
   onPlaceSelect: (place: PlaceResult) => void;
   onReportHint: () => void;
+  filters: FilterState;
+  onFiltersChange: (filters: FilterState) => void;
 };
 
 export function AppSidebar({
   reports,
+  allReports,
   reportsLoading,
   userLat,
   userLng,
@@ -24,8 +29,14 @@ export function AppSidebar({
   profile,
   onProfileChange,
   onPlaceSelect,
-  onReportHint
+  onReportHint,
+  filters,
+  onFiltersChange
 }: AppSidebarProps) {
+  const alta = allReports.filter((r) => r.severidad === "alta").length;
+  const media = allReports.filter((r) => r.severidad === "media").length;
+  const baja = allReports.filter((r) => r.severidad === "baja").length;
+
   return (
     <aside className="sidebar">
       <div>
@@ -60,25 +71,48 @@ export function AppSidebar({
 
       <div className="stats-grid">
         <div className="stat-box">
-          <div className="stat-number">
-            {reportsLoading ? "…" : reports.length}
+          <div className="stat-number" style={{ color: "#ef4444" }}>
+            {reportsLoading ? "…" : alta}
           </div>
-          <div className="stat-label">Barreras activas</div>
+          <div className="stat-label">Severidad alta</div>
         </div>
         <div className="stat-box">
-          <div className="stat-number">TJ</div>
-          <div className="stat-label">Zona activa</div>
+          <div className="stat-number" style={{ color: "#f59e0b" }}>
+            {reportsLoading ? "…" : media}
+          </div>
+          <div className="stat-label">Severidad media</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-number" style={{ color: "#10b981" }}>
+            {reportsLoading ? "…" : baja}
+          </div>
+          <div className="stat-label">Severidad baja</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-number">{reportsLoading ? "…" : allReports.length}</div>
+          <div className="stat-label">Total activas</div>
         </div>
       </div>
 
+      <FilterBar filters={filters} onChange={onFiltersChange} />
+
       <div className="report-list-container">
-        <div className="section-title">Mapa vivo de reportes</div>
+        <div className="section-title">
+          Mapa vivo
+          {reports.length !== allReports.length && (
+            <span style={{ fontWeight: 400, marginLeft: 6, color: "var(--text-muted)" }}>
+              ({reports.length} de {allReports.length})
+            </span>
+          )}
+        </div>
         <div id="log-reportes">
           {reports.length === 0 ? (
             <p className="empty-report">
               {reportsLoading
                 ? "Cargando reportes..."
-                : "Sin reportes aún. Haz clic en el mapa para reportar una barrera."}
+                : allReports.length > 0
+                  ? "Ningún reporte coincide con los filtros activos."
+                  : "Sin reportes aún. Haz clic en el mapa para reportar una barrera."}
             </p>
           ) : (
             reports.map((report) => (

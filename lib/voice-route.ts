@@ -38,13 +38,15 @@ function normalizeObstacles(raw: unknown): VoiceRouteObstacle[] | undefined {
       const latitude = asNumber(o.latitude ?? o.lat);
       const longitude = asNumber(o.longitude ?? o.lng ?? o.lon);
       if (latitude === null || longitude === null) return null;
+      const distancia = asNumber(o.distancia_metros);
       return {
-        descripcion:
-          typeof o.descripcion === "string" ? o.descripcion : undefined,
-        tipo: typeof o.tipo === "string" ? o.tipo : undefined,
         latitude,
         longitude,
-        distancia_metros: asNumber(o.distancia_metros) ?? undefined,
+        ...(typeof o.descripcion === "string"
+          ? { descripcion: o.descripcion }
+          : {}),
+        ...(typeof o.tipo === "string" ? { tipo: o.tipo } : {}),
+        ...(distancia !== null ? { distancia_metros: distancia } : {}),
       } satisfies VoiceRouteObstacle;
     })
     .filter((o): o is VoiceRouteObstacle => o !== null);

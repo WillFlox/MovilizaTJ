@@ -17,5 +17,6 @@ export type LeafletLike = {
 };
 
 export type MapViewHandle = {
-  drawRoute: (lat: number, lng: number, label?: string) => string | null;
+  drawRoute: (lat: number, lng: number, label?: string) => void;
+  clearRoute: () => void;
 };

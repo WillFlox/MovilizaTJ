@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { AccessibilityProfileValue } from "@/lib/constants";
 
 const PROFILE_ICONS: Record<AccessibilityProfileValue, string> = {
@@ -16,8 +17,14 @@ export function AppHeader({ gpsStatus, profile }: AppHeaderProps) {
   return (
     <header className="navbar">
       <div className="logo">
-        <div className="logo-icon">♿</div>
-        Tijuana Sin Barreras
+        <Image
+          src="/logo.png"
+          alt="MovilizaTJ"
+          width={480}
+          height={120}
+          className="logo-img"
+          priority
+        />
       </div>
       <div className="navbar-right">
         <div className="profile-badge" title="Perfil activo">

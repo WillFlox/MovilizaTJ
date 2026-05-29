@@ -24,3 +24,24 @@ export function countNearbyBarriers(
     (r) => distanceMeters(r.latitude, r.longitude, lat, lng) <= radiusMeters
   ).length;
 }
+
+/**
+ * Devuelve los reportes que están dentro de `bufferMeters` de cualquier
+ * punto de la polyline de la ruta. Usado para detectar barreras en el trayecto.
+ *
+ * Para rutas largas OSRM puede dar 100-300 puntos; la malla es suficientemente
+ * densa como para que un buffer de 80 m sea preciso en calle.
+ */
+export function getBarriersOnRoute<T extends { latitude: number; longitude: number }>(
+  reports: T[],
+  routePoints: [number, number][],
+  bufferMeters = 80
+): T[] {
+  if (routePoints.length === 0) return [];
+  return reports.filter((r) =>
+    routePoints.some(
+      ([lat, lng]) =>
+        distanceMeters(r.latitude, r.longitude, lat, lng) <= bufferMeters
+    )
+  );
+}

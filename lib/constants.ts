@@ -15,10 +15,31 @@ export const BARRIER_ICONS: Record<BarrierType, string> = Object.fromEntries(
   BARRIER_TYPES.map((t) => [t.value, t.icon])
 ) as Record<BarrierType, string>;
 
+export const POI_CATEGORIES = [
+  { value: "imss",       label: "IMSS",        icon: "🏥" },
+  { value: "issste",     label: "ISSSTE",       icon: "🏥" },
+  { value: "hospital",   label: "Hospital",     icon: "🏨" },
+  { value: "dif",        label: "DIF",          icon: "🤝" },
+  { value: "cespt",      label: "CESPT",        icon: "💧" },
+  { value: "farmacia",   label: "Farmacia",     icon: "💊" },
+  { value: "transporte", label: "Transporte",   icon: "🚌" },
+  { value: "parque",     label: "Parque",       icon: "🌳" },
+  { value: "educacion",  label: "Educación",    icon: "🎓" },
+  { value: "gobierno",   label: "Gobierno",     icon: "🏛️" }
+] as const;
+
+export type PoiCategory = (typeof POI_CATEGORIES)[number]["value"];
+
+export const POI_ICONS: Record<PoiCategory, string> = Object.fromEntries(
+  POI_CATEGORIES.map((c) => [c.value, c.icon])
+) as Record<PoiCategory, string>;
+
 export const QUICK_DESTINATIONS = [
-  { query: "IMSS", label: "IMSS cercano" },
-  { query: "hospital", label: "Hospital cercano" },
-  { query: "farmacia", label: "Farmacia cercana" }
+  { query: "IMSS",      label: "IMSS",      categoria: "imss"      as const },
+  { query: "hospital",  label: "Hospital",  categoria: "hospital"  as const },
+  { query: "farmacia",  label: "Farmacia",  categoria: "farmacia"  as const },
+  { query: "DIF",       label: "DIF",       categoria: "dif"       as const },
+  { query: "CESPT",     label: "CESPT",     categoria: "cespt"     as const }
 ] as const;
 
 export const ACCESSIBILITY_PROFILES = [

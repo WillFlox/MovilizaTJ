@@ -1,4 +1,4 @@
-import type { BarrierType } from "@/lib/constants";
+import type { BarrierType, PoiCategory } from "@/lib/constants";
 
 export type { BarrierType };
 
@@ -56,7 +56,35 @@ export type ReportSubmitPayload = {
   photo: File | null;
 };
 
+export type PoiRecord = {
+  id: string;
+  nombre: string;
+  categoria: PoiCategory;
+  direccion: string | null;
+  latitude: number;
+  longitude: number;
+  activo: boolean;
+  created_at: string;
+  barrier_count?: number;
+  distance_m?: number;
+};
+
+export type RouteMode = "fastest" | "safest";
+
+export type RouteFoundData = {
+  distance: number;
+  duration: number;
+  routePoints: [number, number][];
+  destLat: number;
+  destLng: number;
+  label: string;
+};
+
 export type RouteState = {
   warning: string | null;
   destination: string | null;
+  distance: number | null;
+  duration: number | null;
+  barriersOnRoute: ReportRecord[];
+  mode: RouteMode;
 };

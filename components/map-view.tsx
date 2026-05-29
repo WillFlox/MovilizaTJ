@@ -11,6 +11,7 @@ import { BARRIER_ICONS, TIJUANA_CENTER } from "@/lib/constants";
 import type { LeafletLike, MapViewHandle } from "@/lib/leaflet-types";
 import { syncUserLocation } from "@/lib/api-client";
 import type { ReportRecord } from "@/lib/types";
+import type { RouteFoundData, RouteMode } from "@/lib/types";
 import type {
   Control,
   DivIcon,
@@ -19,80 +20,131 @@ import type {
   Marker
 } from "leaflet";
 
+type RoutingControl = Control & {
+  on: (event: string, handler: (e: unknown) => void) => RoutingControl;
+};
+
+type RouteFoundEvent = {
+  routes: Array<{
+    summary: { totalDistance: number; totalTime: number };
+    coordinates: Array<{ lat: number; lng: number }>;
+  }>;
+};
+
+function routePointsFromCoordinates(
+  coordinates: Array<{ lat: number; lng: number }>
+): [number, number][] {
+  return coordinates.map((c) => [c.lat, c.lng]);
+}
+
 type MapViewProps = {
   reports: ReportRecord[];
+  routeMode: RouteMode;
   onMapClick: (latitude: number, longitude: number) => void;
   onUserPositionChange: (position: [number, number]) => void;
   onGpsStatusChange: (status: string) => void;
-  onRouteRequest: (lat: number, lng: number, label?: string) => string | null;
+  onRouteFound: (data: RouteFoundData) => void;
 };
 
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(
   function MapView(props, ref) {
-    // Guardamos todos los callbacks en refs para que nunca causen
-    // que el efecto de inicialización del mapa se destruya y recree.
+    // Todos los callbacks en refs: nunca causan re-inicialización del mapa.
     const onMapClickRef = useRef(props.onMapClick);
     const onUserPositionChangeRef = useRef(props.onUserPositionChange);
     const onGpsStatusChangeRef = useRef(props.onGpsStatusChange);
-    const onRouteRequestRef = useRef(props.onRouteRequest);
+    const onRouteFoundRef = useRef(props.onRouteFound);
+    const routeModeRef = useRef(props.routeMode);
 
-    // Actualizamos las refs en cada render sin re-ejecutar efectos.
     onMapClickRef.current = props.onMapClick;
     onUserPositionChangeRef.current = props.onUserPositionChange;
     onGpsStatusChangeRef.current = props.onGpsStatusChange;
-    onRouteRequestRef.current = props.onRouteRequest;
+    onRouteFoundRef.current = props.onRouteFound;
+    routeModeRef.current = props.routeMode;
 
     const leafletRef = useRef<LeafletLike | null>(null);
     const mapInstanceRef = useRef<LeafletMap | null>(null);
     const userMarkerRef = useRef<Marker | null>(null);
-    const routeControlRef = useRef<Control | null>(null);
+    const destMarkerRef = useRef<Marker | null>(null);
+    const routeControlRef = useRef<RoutingControl | null>(null);
     const coverageCircleRef = useRef<L.Circle | null>(null);
     const barriersLayerRef = useRef<LayerGroup | null>(null);
     const userPositionRef = useRef<[number, number]>(TIJUANA_CENTER);
     const watchIdRef = useRef<number | null>(null);
 
-    // Estado (no ref) para que el efecto de marcadores se re-ejecute
-    // cuando el mapa termina de inicializarse.
     const [mapReady, setMapReady] = useState(false);
 
     useImperativeHandle(ref, () => ({
       drawRoute(lat: number, lng: number, label?: string) {
         const map = mapInstanceRef.current;
         const L = leafletRef.current;
-        if (!map || !L) return null;
+        if (!map || !L) return;
 
         if (routeControlRef.current) {
           map.removeControl(routeControlRef.current);
+          routeControlRef.current = null;
+        }
+        if (destMarkerRef.current) {
+          destMarkerRef.current.remove();
+          destMarkerRef.current = null;
         }
 
-        routeControlRef.current = L.Routing.control({
+        const isSafest = routeModeRef.current === "safest";
+        const routeColor = isSafest ? "#10b981" : "#2563eb";
+
+        const control = L.Routing.control({
           waypoints: [
             L.latLng(userPositionRef.current[0], userPositionRef.current[1]),
             L.latLng(lat, lng)
           ],
           lineOptions: {
-            styles: [{ color: "#2563eb", opacity: 0.8, weight: 6 }]
+            styles: [{ color: routeColor, opacity: 0.85, weight: 6 }]
           },
           addWaypoints: false,
           draggableWaypoints: false,
           routeWhileDragging: false,
           createMarker: () => null
-        }).addTo(map);
+        }).addTo(map) as RoutingControl;
 
-        const warning = onRouteRequestRef.current(lat, lng, label);
+        // leaflet-routing-machine dispara "routesfound", no "routefound"
+        control.on("routesfound", (e: unknown) => {
+          const event = e as RouteFoundEvent;
+          const route = event.routes[0];
+          if (!route) return;
+          onRouteFoundRef.current({
+            distance: route.summary.totalDistance,
+            duration: route.summary.totalTime,
+            routePoints: routePointsFromCoordinates(route.coordinates),
+            destLat: lat,
+            destLng: lng,
+            label: label ?? "Destino"
+          });
+        });
 
-        L.marker([lat, lng])
+        routeControlRef.current = control;
+
+        destMarkerRef.current = L.marker([lat, lng])
           .addTo(map)
           .bindPopup(`<b>${label ?? "Destino"}</b>`)
           .openPopup();
 
         map.setView([lat, lng], 15);
-        return warning;
+      },
+
+      clearRoute() {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        if (routeControlRef.current) {
+          map.removeControl(routeControlRef.current);
+          routeControlRef.current = null;
+        }
+        if (destMarkerRef.current) {
+          destMarkerRef.current.remove();
+          destMarkerRef.current = null;
+        }
       }
     }));
 
-    // Re-dibuja marcadores de barreras cuando reports cambia O cuando
-    // el mapa termina de estar listo (mapReady pasa a true).
+    // Re-dibuja marcadores cuando cambian reportes o cuando el mapa está listo.
     useEffect(() => {
       const map = mapInstanceRef.current;
       const L = leafletRef.current;
@@ -101,7 +153,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
       if (barriersLayerRef.current) {
         barriersLayerRef.current.clearLayers();
       } else {
-        // Usamos markerClusterGroup si está disponible, fallback a layerGroup
         barriersLayerRef.current = (L.markerClusterGroup
           ? L.markerClusterGroup({
               maxClusterRadius: 50,
@@ -149,8 +200,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
       });
     }, [props.reports, mapReady]);
 
-    // Inicialización del mapa — solo se ejecuta UNA VEZ gracias al array vacío.
-    // Los callbacks se acceden via ref, así no causan re-inicialización.
+    // Inicialización del mapa — solo una vez (array vacío).
     useEffect(() => {
       let cancelled = false;
 
@@ -164,6 +214,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         }
 
         await import("leaflet-routing-machine");
+        await import("leaflet.markercluster");
         leafletRef.current = L;
 
         const map = L.map("map", {
@@ -179,9 +230,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
           { maxZoom: 20, subdomains: "abcd" }
         ).addTo(map);
-
-        // Cargamos leaflet.markercluster después de que Leaflet esté listo
-        await import("leaflet.markercluster");
 
         coverageCircleRef.current = L.circle(TIJUANA_CENTER, {
           radius: 1700,
@@ -266,7 +314,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         mapInstanceRef.current?.remove();
         mapInstanceRef.current = null;
         userMarkerRef.current = null;
+        destMarkerRef.current = null;
         barriersLayerRef.current = null;
+        routeControlRef.current = null;
         setMapReady(false);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,7 +325,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     return (
       <main className="map-wrapper">
         <div className="map-helper">
-          <strong>Tijuana Sin Barreras</strong>
+          <strong>MovilizaTJ</strong>
           <span>
             Haz clic en el mapa para reportar una barrera. Busca tu destino en
             el panel para trazar una ruta accesible desde tu posición.

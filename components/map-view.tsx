@@ -133,7 +133,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
 
         routeControlRef.current = control;
 
-        destMarkerRef.current = L.marker([lat, lng])
+        const destIcon = L.icon({
+          iconUrl: "/pin.png",
+          iconSize: [48, 48],
+          iconAnchor: [24, 48],
+          popupAnchor: [0, -50]
+        });
+
+        destMarkerRef.current = L.marker([lat, lng], { icon: destIcon })
           .addTo(map)
           .bindPopup(`<b>${label ?? "Destino"}</b>`)
           .openPopup();

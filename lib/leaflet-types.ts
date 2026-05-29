@@ -14,6 +14,7 @@ export type LeafletLike = {
   tileLayer: typeof import("leaflet").tileLayer;
   circle: typeof import("leaflet").circle;
   divIcon: typeof import("leaflet").divIcon;
+  icon: typeof import("leaflet").icon;
   marker: typeof import("leaflet").marker;
   latLng: typeof import("leaflet").latLng;
   layerGroup: typeof import("leaflet").layerGroup;

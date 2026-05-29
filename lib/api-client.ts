@@ -1,5 +1,27 @@
 import type { ReportRecord, ReportSubmitPayload } from "@/lib/types";
 
+export function getMovilizaSessionId(): string {
+  const key = "movilizatj_session_id";
+
+  if (typeof window === "undefined") {
+    return "server_side_session";
+  }
+
+  let sessionId = window.localStorage.getItem(key);
+
+  if (!sessionId) {
+    if (window.crypto?.randomUUID) {
+      sessionId = window.crypto.randomUUID();
+    } else {
+      sessionId = `movilizatj_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    }
+
+    window.localStorage.setItem(key, sessionId);
+  }
+
+  return sessionId;
+}
+
 const N8N_CLASIFICAR_FOTO_URL =
   process.env.NEXT_PUBLIC_N8N_CLASIFICAR_FOTO_URL ||
   "https://auto.curso.desarrolloslan.com/webhook/clasificar-foto";

@@ -76,26 +76,23 @@ function pointToSegmentMeters(
 /**
  * Calcula waypoints de desvío para la ruta "más segura".
  *
- * Estrategia: para cada cluster de barreras sobre el trayecto, genera UN
- * único waypoint desplazado ~150 m perpendicular a la línea directa
- * (suficiente para alcanzar la calle paralela siguiente en Tijuana).
- * Se elige el lado con menos barreras totales para minimizar interferencias.
- *
- * Limitaciones deliberadas que evitan rutas erráticas:
- *  - Solo se desvía por barreras a ≤ 80 m de la línea directa.
- *  - Un solo desvío por cada tramo de 250 m (no se acumulan zigzags).
- *  - Máximo 4 waypoints de desvío en total.
+ * Estrategia de "evitar cuadra":
+ *  1. Detecta clusters de barreras sobre el trayecto.
+ *  2. Por cada cluster genera DOS waypoints en la calle paralela:
+ *     - Uno ANTES del cluster (para que OSRM tome la calle paralela anticipadamente).
+ *     - Uno DESPUÉS del cluster (para retomar el trayecto sin pasar por la cuadra).
+ *  3. El offset lateral es de ~110 m (≈ 1 cuadra en Tijuana) para asegurar
+ *     que el waypoint quede sobre la siguiente calle real y OSRM lo snappee
+ *     correctamente a la vialidad paralela.
+ *  4. Máximo 1 cluster atendido (2 waypoints en total) para evitar zigzags.
  */
 export function computeDetourWaypoints(
   startLat: number, startLng: number,
   destLat: number, destLng: number,
   barriers: { latitude: number; longitude: number }[],
-  bufferMeters = 80,
-  offsetMeters = 150
+  bufferMeters = 100,
+  offsetMeters = 110
 ): [number, number][] {
-  const MAX_WAYPOINTS = 4;
-  const DEDUP_METERS  = 250;
-
   const mPerDegLat = 111_320;
   const cosLat = Math.cos(((startLat + destLat) / 2) * (Math.PI / 180));
   const mPerDegLng = 111_320 * cosLat;
@@ -105,15 +102,15 @@ export function computeDetourWaypoints(
   const lenM  = Math.sqrt(dLatM ** 2 + dLngM ** 2);
   if (lenM < 1) return [];
 
-  // Dirección normalizada (metros)
+  // Dirección normalizada
   const ry = dLatM / lenM;
   const rx = dLngM / lenM;
 
-  // Vector perpendicular (rotación 90° CCW: izquierda de la marcha)
+  // Vector perpendicular (izquierda de la marcha)
   const perpLat = (-rx) / mPerDegLat;
   const perpLng = ( ry) / mPerDegLng;
 
-  // --- Proyectar barreras sobre la línea directa ---
+  // Proyectar barreras sobre la línea directa
   const candidates: { t: number; cross: number }[] = [];
 
   for (const b of barriers) {
@@ -134,28 +131,28 @@ export function computeDetourWaypoints(
 
   if (candidates.length === 0) return [];
 
+  // Agrupar en un único cluster (el de mayor concentración de barreras)
   candidates.sort((a, b) => a.t - b.t);
 
-  // --- Deduplicar en clusters de DEDUP_METERS ---
-  const clusters: { t: number; cross: number }[] = [];
-  for (const c of candidates) {
-    const last = clusters[clusters.length - 1];
-    if (!last || (c.t - last.t) * lenM > DEDUP_METERS) {
-      clusters.push(c);
-    } else {
-      // Acumular el cross product para elegir lado mayoritario
-      last.cross += c.cross;
-    }
-  }
+  const crossSum = candidates.reduce((s, c) => s + c.cross, 0);
+  const side: 1 | -1 = crossSum > 0 ? -1 : 1;
 
-  // --- Generar waypoints (máx MAX_WAYPOINTS) ---
-  return clusters.slice(0, MAX_WAYPOINTS).map(({ t, cross }) => {
-    // Desviar al lado contrario donde está la mayoría de barreras
-    const side: 1 | -1 = cross > 0 ? -1 : 1;
+  const tMin = candidates[0].t;
+  const tMax = candidates[candidates.length - 1].t;
+
+  // Margen de 0.08 (≈ 8% del trayecto) antes y después del cluster
+  const MARGIN = 0.08;
+  const tBefore = Math.max(0.05, tMin - MARGIN);
+  const tAfter  = Math.min(0.95, tMax + MARGIN);
+
+  const makePoint = (t: number): [number, number] => {
     const lat = startLat + t * (destLat - startLat) + side * offsetMeters * perpLat;
     const lng = startLng + t * (destLng - startLng) + side * offsetMeters * perpLng;
-    return [lat, lng] as [number, number];
-  });
+    return [lat, lng];
+  };
+
+  // Dos waypoints: entrada y salida de la cuadra alternativa
+  return [makePoint(tBefore), makePoint(tAfter)];
 }
 
 export function getBarriersOnRoute<T extends { latitude: number; longitude: number }>(

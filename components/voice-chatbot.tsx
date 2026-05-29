@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { N8nVoiceResponse, VoiceRouteData, VoiceRouteObstacle } from "@/lib/types";
+import { getMovilizaSessionId } from "@/lib/api-client";
 
 type ChatState = "idle" | "recording" | "processing" | "speaking" | "error";
 
@@ -87,6 +88,7 @@ export function VoiceChatbot({
       formData.append("audio", blob, `consulta.${ext}`);
       formData.append("latitude", String(userLat));
       formData.append("longitude", String(userLng));
+      formData.append("session_id", getMovilizaSessionId());
 
       try {
         const res = await fetch("/api/voice-chat", {

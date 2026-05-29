@@ -149,9 +149,11 @@ export function MapClient() {
   const buildAvoidPoints = useCallback(
     (destLat: number, destLng: number): [number, number][] | undefined => {
       if (routeMode !== "safest") return undefined;
-      // Solo evitar barreras de severidad alta; las de media se muestran como
-      // advertencia en el toast pero no fuerzan desvíos (evita rutas erráticas)
-      const toAvoid = reports.filter((r) => r.severidad === "alta");
+      // Considerar barreras de severidad alta y media para el cálculo del desvío.
+      // La función devuelve como máximo 1 waypoint a ~60 m, evitando zigzags.
+      const toAvoid = reports.filter(
+        (r) => r.severidad === "alta" || r.severidad === "media"
+      );
       if (toAvoid.length === 0) return undefined;
       const pts = computeDetourWaypoints(
         userPosition[0], userPosition[1],

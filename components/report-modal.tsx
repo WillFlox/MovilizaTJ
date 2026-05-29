@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BARRIER_TYPES, type BarrierType } from "@/lib/constants";
 import type { ReportSubmitPayload } from "@/lib/types";
+
+const MAX_PHOTO_MB = 4;
 
 type ReportModalProps = {
   pending: { latitude: number; longitude: number };
@@ -13,16 +15,50 @@ type ReportModalProps = {
 export function ReportModal({ pending, onClose, onSubmit }: ReportModalProps) {
   const [tipo, setTipo] = useState<BarrierType>(BARRIER_TYPES[0].value);
   const [descripcion, setDescripcion] = useState("");
-  const [severidad, setSeveridad] = useState<ReportSubmitPayload["severidad"]>("media");
+  const [severidad, setSeveridad] =
+    useState<ReportSubmitPayload["severidad"]>("media");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPhotoError(null);
+
+    if (!file) {
+      setPhoto(null);
+      setPhotoPreview(null);
+      return;
+    }
+
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      setPhotoError(`La foto supera los ${MAX_PHOTO_MB} MB. Elige una más pequeña.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  function removePhoto() {
+    setPhoto(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    setSubmitError(null);
     setSubmitting(true);
     try {
       await onSubmit({ tipo, descripcion, severidad, photo });
       onClose();
+    } catch {
+      setSubmitError("No se pudo enviar el reporte. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
     }
@@ -31,38 +67,50 @@ export function ReportModal({ pending, onClose, onSubmit }: ReportModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h3>Reportar barrera</h3>
+        <div className="modal-header">
+          <h3>Reportar barrera</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+
         <p className="modal-coords">
-          Lat: {pending.latitude.toFixed(5)} · Lng: {pending.longitude.toFixed(5)}
+          📍 Lat: {pending.latitude.toFixed(5)} · Lng:{" "}
+          {pending.longitude.toFixed(5)}
         </p>
 
         <form onSubmit={handleSubmit} className="report-form">
           <label>
             Tipo de barrera
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value as BarrierType)}
-            >
+            <div className="barrier-grid">
               {BARRIER_TYPES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.icon} {item.label}
-                </option>
+                <button
+                  key={item.value}
+                  type="button"
+                  className={`barrier-chip${tipo === item.value ? " barrier-chip--active" : ""}`}
+                  onClick={() => setTipo(item.value as BarrierType)}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
               ))}
-            </select>
+            </div>
           </label>
 
           <label>
             Severidad
-            <select
-              value={severidad}
-              onChange={(e) =>
-                setSeveridad(e.target.value as ReportSubmitPayload["severidad"])
-              }
-            >
-              <option value="baja">Baja</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-            </select>
+            <div className="severity-row">
+              {(["baja", "media", "alta"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`severity-chip severity-chip--${s}${severidad === s ? " severity-chip--active" : ""}`}
+                  onClick={() => setSeveridad(s)}
+                >
+                  {s === "baja" ? "🟢 Baja" : s === "media" ? "🟡 Media" : "🔴 Alta"}
+                </button>
+              ))}
+            </div>
           </label>
 
           <label>
@@ -71,19 +119,42 @@ export function ReportModal({ pending, onClose, onSubmit }: ReportModalProps) {
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               placeholder="Ej. banqueta destruida sin rampa alternativa"
-              rows={3}
+              rows={2}
             />
           </label>
 
           <label>
             Foto (opcional)
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-            />
+            {photoPreview ? (
+              <div className="photo-preview-wrapper">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                  src={photoPreview}
+                  alt="Vista previa"
+                  className="photo-preview"
+                />
+                <button
+                  type="button"
+                  className="photo-remove"
+                  onClick={removePhoto}
+                >
+                  ✕ Quitar foto
+                </button>
+              </div>
+            ) : (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoChange}
+                className="file-input"
+              />
+            )}
+            {photoError && <p className="field-error">{photoError}</p>}
           </label>
+
+          {submitError && <p className="field-error">{submitError}</p>}
 
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

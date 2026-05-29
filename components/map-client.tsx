@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { MapView } from "@/components/map-view";
 import { ReportModal } from "@/components/report-modal";
 import { useReports } from "@/hooks/use-reports";
+import { useAccessibilityProfile } from "@/hooks/use-accessibility-profile";
 import { submitReport } from "@/lib/api-client";
 import { TIJUANA_CENTER } from "@/lib/constants";
 import type { MapViewHandle } from "@/lib/leaflet-types";
@@ -19,23 +20,44 @@ import type {
 export function MapClient() {
   const mapRef = useRef<MapViewHandle>(null);
   const { reports, loading, addReport } = useReports();
+  const { profile, setProfile, getRouteWarning } = useAccessibilityProfile();
 
   const [userPosition, setUserPosition] =
     useState<[number, number]>(TIJUANA_CENTER);
   const [gpsStatus, setGpsStatus] = useState("Buscando señal GPS...");
-  const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
+  const [pendingReport, setPendingReport] = useState<PendingReport | null>(
+    null
+  );
   const [routeState, setRouteState] = useState<RouteState>({
     warning: null,
     destination: null
   });
 
-  const handleMapClick = useCallback((latitude: number, longitude: number) => {
-    setPendingReport({ latitude, longitude });
-  }, []);
+  const handleMapClick = useCallback(
+    (latitude: number, longitude: number) => {
+      setPendingReport({ latitude, longitude });
+    },
+    []
+  );
 
-  const handlePlaceSelect = useCallback((place: PlaceResult) => {
-    mapRef.current?.drawRoute(place.latitude, place.longitude, place.name);
-  }, []);
+  const handleRouteRequest = useCallback(
+    (lat: number, lng: number, label?: string): string | null => {
+      const warning = getRouteWarning(reports, lat, lng);
+      setRouteState({
+        warning,
+        destination: label ?? "Destino seleccionado"
+      });
+      return warning;
+    },
+    [getRouteWarning, reports]
+  );
+
+  const handlePlaceSelect = useCallback(
+    (place: PlaceResult) => {
+      mapRef.current?.drawRoute(place.latitude, place.longitude, place.name);
+    },
+    []
+  );
 
   const handleReportSubmit = useCallback(
     async (payload: ReportSubmitPayload) => {
@@ -48,7 +70,7 @@ export function MapClient() {
 
   return (
     <div className="app-shell">
-      <AppHeader gpsStatus={gpsStatus} />
+      <AppHeader gpsStatus={gpsStatus} profile={profile} />
 
       <div className="main-container">
         <AppSidebar
@@ -57,6 +79,8 @@ export function MapClient() {
           userLat={userPosition[0]}
           userLng={userPosition[1]}
           routeState={routeState}
+          profile={profile}
+          onProfileChange={setProfile}
           onPlaceSelect={handlePlaceSelect}
           onReportHint={() =>
             window.alert(
@@ -71,7 +95,7 @@ export function MapClient() {
           onMapClick={handleMapClick}
           onUserPositionChange={setUserPosition}
           onGpsStatusChange={setGpsStatus}
-          onRouteStateChange={setRouteState}
+          onRouteRequest={handleRouteRequest}
         />
       </div>
 

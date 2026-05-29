@@ -7,7 +7,6 @@ import {
   useRef
 } from "react";
 import { BARRIER_ICONS, TIJUANA_CENTER } from "@/lib/constants";
-import { countNearbyBarriers } from "@/lib/geo";
 import type { LeafletLike, MapViewHandle } from "@/lib/leaflet-types";
 import { syncUserLocation } from "@/lib/api-client";
 import type { ReportRecord } from "@/lib/types";
@@ -24,10 +23,7 @@ type MapViewProps = {
   onMapClick: (latitude: number, longitude: number) => void;
   onUserPositionChange: (position: [number, number]) => void;
   onGpsStatusChange: (status: string) => void;
-  onRouteStateChange: (state: {
-    warning: string | null;
-    destination: string | null;
-  }) => void;
+  onRouteRequest: (lat: number, lng: number, label?: string) => string | null;
 };
 
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(
@@ -37,7 +33,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
       onMapClick,
       onUserPositionChange,
       onGpsStatusChange,
-      onRouteStateChange
+      onRouteRequest
     },
     ref
   ) {
@@ -49,10 +45,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     const barriersLayerRef = useRef<LayerGroup | null>(null);
     const userPositionRef = useRef<[number, number]>(TIJUANA_CENTER);
     const watchIdRef = useRef<number | null>(null);
-    const reportsRef = useRef(reports);
     const mapReadyRef = useRef(false);
-
-    reportsRef.current = reports;
 
     useImperativeHandle(ref, () => ({
       drawRoute(lat: number, lng: number, label?: string) {
@@ -78,16 +71,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           createMarker: () => null
         }).addTo(map);
 
-        const nearby = countNearbyBarriers(reportsRef.current, lat, lng, 400);
-        const warning =
-          nearby > 0
-            ? `Atención: ${nearby} barrera(s) reportada(s) cerca del destino. La ruta puede requerir precaución.`
-            : null;
-
-        onRouteStateChange({
-          warning,
-          destination: label ?? "Destino seleccionado"
-        });
+        const warning = onRouteRequest(lat, lng, label);
 
         L.marker([lat, lng])
           .addTo(map)
@@ -112,9 +96,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
 
       reports.forEach((report) => {
         const icon = BARRIER_ICONS[report.tipo] ?? "📍";
+        const severityColor =
+          report.severidad === "alta"
+            ? "#ef4444"
+            : report.severidad === "media"
+              ? "#f59e0b"
+              : "#10b981";
+
         const markerIcon = L.divIcon({
           className: "barrier-marker",
-          html: `<div class="barrier-pin">${icon}</div>`,
+          html: `<div class="barrier-pin" style="border-color:${severityColor}">${icon}</div>`,
           iconSize: [32, 32],
           iconAnchor: [16, 16]
         });
@@ -123,6 +114,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           <div style="min-width:180px">
             <div class="popup-title">${icon} ${report.tipo.replace(/_/g, " ")}</div>
             <div class="popup-text">${report.descripcion ?? "Sin descripción"}</div>
+            <div style="margin-top:6px;font-size:11px;color:${severityColor};font-weight:700">
+              Severidad: ${report.severidad}
+            </div>
             ${
               report.foto_url
                 ? `<img src="${report.foto_url}" alt="Foto reporte" style="width:100%;margin-top:8px;border-radius:8px" />`
@@ -199,7 +193,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
             const lng = position.coords.longitude;
             userPositionRef.current = [lat, lng];
             onUserPositionChange([lat, lng]);
-            onGpsStatusChange("Ubicación GPS activa");
+            onGpsStatusChange("📍 GPS activo");
 
             const customUserIcon: DivIcon = L.divIcon({
               className: "user-pulse-marker",
@@ -223,7 +217,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
             coverageCircleRef.current?.setLatLng([lat, lng]);
             syncUserLocation(lat, lng).catch(() => null);
           },
-          () => onGpsStatusChange("Usando ubicación fija (TJ)"),
+          () => onGpsStatusChange("⚠️ Ubicación fija (TJ)"),
           { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
         );
       }
@@ -239,15 +233,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         mapInstanceRef.current = null;
         mapReadyRef.current = false;
       };
-    }, [onMapClick, onGpsStatusChange, onRouteStateChange, onUserPositionChange]);
+    }, [onMapClick, onGpsStatusChange, onUserPositionChange, onRouteRequest]);
 
     return (
       <main className="map-wrapper">
         <div className="map-helper">
-          <strong>Enfoque híbrido</strong>
+          <strong>Tijuana Sin Barreras</strong>
           <span>
-            Leaflet + Supabase para barreras en vivo. Google Places solo para
-            buscar IMSS, hospitales y destinos públicos.
+            Haz clic en el mapa para reportar una barrera. Busca tu destino en
+            el panel para trazar una ruta accesible desde tu posición.
           </span>
         </div>
         <div id="map" />

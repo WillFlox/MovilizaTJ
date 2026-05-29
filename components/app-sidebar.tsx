@@ -1,5 +1,6 @@
 import { PlacesSearch } from "@/components/places-search";
-import { BARRIER_ICONS } from "@/lib/constants";
+import { ProfileSelector } from "@/components/profile-selector";
+import { BARRIER_ICONS, type AccessibilityProfileValue } from "@/lib/constants";
 import type { PlaceResult, ReportRecord, RouteState } from "@/lib/types";
 
 type AppSidebarProps = {
@@ -8,6 +9,8 @@ type AppSidebarProps = {
   userLat: number;
   userLng: number;
   routeState: RouteState;
+  profile: AccessibilityProfileValue;
+  onProfileChange: (value: AccessibilityProfileValue) => void;
   onPlaceSelect: (place: PlaceResult) => void;
   onReportHint: () => void;
 };
@@ -18,19 +21,23 @@ export function AppSidebar({
   userLat,
   userLng,
   routeState,
+  profile,
+  onProfileChange,
   onPlaceSelect,
   onReportHint
 }: AppSidebarProps) {
   return (
     <aside className="sidebar">
       <div>
-        <div className="section-title">Accesibilidad multimodal</div>
-        <div className="headline">Ruteo accesible en tiempo real</div>
+        <div className="section-title">Plataforma ciudadana</div>
+        <div className="headline">Tijuana Sin Barreras</div>
         <p className="subtitle">
-          Reporta barreras con foto y GPS. Busca servicios públicos con Google
-          Places y traza rutas con Leaflet evitando zonas críticas.
+          Reporta obstáculos con foto y GPS. Busca servicios públicos y traza
+          rutas accesibles según tu perfil de movilidad.
         </p>
       </div>
+
+      <ProfileSelector value={profile} onChange={onProfileChange} />
 
       <PlacesSearch
         userLat={userLat}
@@ -41,8 +48,10 @@ export function AppSidebar({
       {routeState.warning && (
         <div className="route-warning">{routeState.warning}</div>
       )}
-      {routeState.destination && (
-        <div className="destination-chip">Destino: {routeState.destination}</div>
+      {routeState.destination && !routeState.warning && (
+        <div className="destination-chip">
+          ✅ Ruta hacia: {routeState.destination}
+        </div>
       )}
 
       <button className="btn-report" onClick={onReportHint}>
@@ -73,7 +82,10 @@ export function AppSidebar({
             </p>
           ) : (
             reports.map((report) => (
-              <div className="report-item" key={report.id}>
+              <div
+                className={`report-item report-item--${report.severidad}`}
+                key={report.id}
+              >
                 <span className="tag">
                   {BARRIER_ICONS[report.tipo]}{" "}
                   {report.tipo.replace(/_/g, " ")}
@@ -81,9 +93,7 @@ export function AppSidebar({
                 <span style={{ fontWeight: 800, fontSize: "14px" }}>
                   {report.descripcion ?? "Reporte ciudadano"}
                 </span>
-                <span
-                  style={{ color: "var(--text-muted)", fontSize: "12px" }}
-                >
+                <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>
                   {report.severidad} ·{" "}
                   {new Date(report.created_at).toLocaleString("es-MX")}
                 </span>

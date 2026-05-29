@@ -158,6 +158,20 @@ export async function POST(req: NextRequest) {
 
       const data = unwrapN8nPayload(parsed);
 
+      // ── DEBUG: muestra el payload completo de n8n en la consola del servidor ──
+      console.log("[voice-chat] payload de n8n:", JSON.stringify({
+        pide_ruta:    data.pide_ruta,
+        ruta:         data.ruta,
+        destino_ruta: data.destino_ruta,
+        modo_consulta:data.modo_consulta,
+        respuesta_texto: typeof data.respuesta_texto === "string"
+          ? data.respuesta_texto.slice(0, 80)
+          : undefined,
+        obstaculos_count: Array.isArray(data.reportes_encontrados)
+          ? data.reportes_encontrados.length
+          : 0,
+      }, null, 2));
+
       // Si viene ruta u obstáculos, devolver JSON completo para que el cliente
       // pueda dibujar la ruta y/o reproducir el audio base64.
       const ruta = extractVoiceRoute(data, geoContext);

@@ -63,7 +63,17 @@ function pickDestination(data: Record<string, unknown>): string | null {
   ];
   for (const key of keys) {
     const value = data[key];
+    // Puede venir como string directo
     if (typeof value === "string" && value.trim()) return value.trim();
+    // O como objeto { value: "...", name: "...", text: "..." } desde n8n
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      for (const inner of ["value", "name", "text", "label", "destino"]) {
+        if (typeof obj[inner] === "string" && (obj[inner] as string).trim()) {
+          return (obj[inner] as string).trim();
+        }
+      }
+    }
   }
   return null;
 }

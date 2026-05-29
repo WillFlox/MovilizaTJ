@@ -300,48 +300,49 @@ export function MapClient() {
           onRouteFound={handleRouteFound}
         />
 
-        {/* Logo — esquina superior izquierda */}
-        <div className="map-overlay-logo">
-          <Image
-            src="/logo.png"
-            alt="MovilizaTJ"
-            width={200}
-            height={52}
-            className="map-overlay-logo-img"
-            priority
-          />
-        </div>
-
-        {/* Barra de búsqueda — centro superior */}
-        <div className="map-overlay-search">
-          <div className="map-search-inner">
-            <PlacesSearch
-              userLat={userPosition[0]}
-              userLng={userPosition[1]}
-              onSelect={handlePlaceSelect}
+        {/* ── Barra superior (desktop: flotante; móvil: barra fija) ── */}
+        <div className="map-top-bar">
+          <div className="map-overlay-logo">
+            <Image
+              src="/logo.png"
+              alt="MovilizaTJ"
+              width={200}
+              height={52}
+              className="map-overlay-logo-img"
+              priority
             />
-            <span className="map-search-icon">🔍</span>
           </div>
-        </div>
 
-        {/* Botones de acción — esquina superior derecha */}
-        <div className="map-overlay-actions">
-          <button
-            className="map-action-btn"
-            onClick={() => setShowSidebar(true)}
-            title="Perfil de accesibilidad"
-            aria-label="Abrir perfil de accesibilidad"
-          >
-            ♿
-          </button>
-          <button
-            className="map-action-btn"
-            onClick={() => setShowSidebar(true)}
-            title="Menú"
-            aria-label="Abrir menú"
-          >
-            ☰
-          </button>
+          {/* Búsqueda — ocupa el centro en desktop, va aquí en móvil */}
+          <div className="map-overlay-search">
+            <div className="map-search-inner">
+              <PlacesSearch
+                userLat={userPosition[0]}
+                userLng={userPosition[1]}
+                onSelect={handlePlaceSelect}
+              />
+              <span className="map-search-icon">🔍</span>
+            </div>
+          </div>
+
+          <div className="map-overlay-actions">
+            <button
+              className="map-action-btn"
+              onClick={() => setShowSidebar(true)}
+              title="Perfil de accesibilidad"
+              aria-label="Abrir perfil de accesibilidad"
+            >
+              ♿
+            </button>
+            <button
+              className="map-action-btn"
+              onClick={() => setShowSidebar(true)}
+              title="Menú"
+              aria-label="Abrir menú"
+            >
+              ☰
+            </button>
+          </div>
         </div>
 
         {/* FAB cámara — esquina inferior derecha */}

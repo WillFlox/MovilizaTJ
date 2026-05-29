@@ -2696,6 +2696,11 @@ body {
   flex: none;
 }
 
+/* ── Wrapper de la barra superior (desktop: transparente) ── */
+.map-top-bar {
+  display: contents; /* hijos siguen posicionados absolutamente */
+}
+
 /* ── Logo overlay — esquina superior izquierda ── */
 .map-overlay-logo {
   position: absolute;
@@ -2743,7 +2748,7 @@ body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: 0.18s ease;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
   color: #1f2937;
   line-height: 1;
 }
@@ -2751,7 +2756,6 @@ body {
 .map-action-btn:hover {
   background: white;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
-  transform: translateY(-1px);
 }
 
 /* ── Barra de búsqueda — centro superior ── */

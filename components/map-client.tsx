@@ -6,6 +6,8 @@ import { AppSidebar, type ReportWithDistance } from "@/components/app-sidebar";
 import { MapView } from "@/components/map-view";
 import { ReportModal } from "@/components/report-modal";
 import { ReportDetailModal } from "@/components/report-detail-modal";
+import { CameraModal } from "@/components/camera-modal";
+import { VoiceChatbot } from "@/components/voice-chatbot";
 import { useReports } from "@/hooks/use-reports";
 import { useAccessibilityProfile } from "@/hooks/use-accessibility-profile";
 import { submitReport } from "@/lib/api-client";
@@ -23,9 +25,12 @@ import type {
   RouteState
 } from "@/lib/types";
 
+// Buffer en metros para detección punto-a-segmento.
+// "fastest": 30 m ≈ ancho de una acera + un carril → solo lo que está en la calle exacta.
+// "safest":  50 m → incluye un carril adyacente para alertas más amplias.
 const ROUTE_BUFFER: Record<RouteMode, number> = {
-  fastest: 80,
-  safest: 150
+  fastest: 30,
+  safest: 50
 };
 
 const EMPTY_ROUTE_STATE: RouteState = {
@@ -46,6 +51,8 @@ export function MapClient() {
     useState<[number, number]>(TIJUANA_CENTER);
   const [gpsStatus, setGpsStatus] = useState("Buscando señal GPS...");
   const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
+  const [quickPhoto, setQuickPhoto] = useState<File | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [routeMode, setRouteMode] = useState<RouteMode>("fastest");
   const [routeState, setRouteState] = useState<RouteState>(EMPTY_ROUTE_STATE);
   const [filters, setFilters] = useState<FilterState>({
@@ -54,6 +61,7 @@ export function MapClient() {
   });
   const [nearbyRadius, setNearbyRadius] = useState(1500);
   const [selectedReport, setSelectedReport] = useState<ReportWithDistance | null>(null);
+  const [gpsReady, setGpsReady] = useState(false);
 
   const lastRouteRef = useRef<{ lat: number; lng: number; label: string } | null>(null);
 
@@ -85,12 +93,43 @@ export function MapClient() {
       .sort((a, b) => a.distance_m - b.distance_m);
   }, [filteredReports, userPosition, nearbyRadius]);
 
+  const handleUserPositionChange = useCallback(
+    (pos: [number, number]) => {
+      setUserPosition(pos);
+      setGpsReady(true);
+    },
+    []
+  );
+
   const handleMapClick = useCallback(
     (latitude: number, longitude: number) => {
       setPendingReport({ latitude, longitude });
     },
     []
   );
+
+  const handleQuickPhotoClick = useCallback(() => {
+    setCameraOpen(true);
+  }, []);
+
+  const handleCameraCapture = useCallback(
+    (file: File) => {
+      const [latitude, longitude] = userPosition;
+      setQuickPhoto(file);
+      setCameraOpen(false);
+      setPendingReport({ latitude, longitude });
+    },
+    [userPosition]
+  );
+
+  const handleCameraClose = useCallback(() => {
+    setCameraOpen(false);
+  }, []);
+
+  const handleReportClose = useCallback(() => {
+    setPendingReport(null);
+    setQuickPhoto(null);
+  }, []);
 
   const handleRouteFound = useCallback(
     (data: RouteFoundData) => {
@@ -157,6 +196,7 @@ export function MapClient() {
       if (!pendingReport) return;
       const saved = await submitReport(pendingReport, payload);
       addReport(saved as ReportRecord);
+      setQuickPhoto(null);
     },
     [addReport, pendingReport]
   );
@@ -190,22 +230,51 @@ export function MapClient() {
           onClearRoute={handleClearRoute}
         />
 
-        <MapView
-          ref={mapRef}
-          reports={filteredReports}
-          routeMode={routeMode}
-          onMapClick={handleMapClick}
-          onUserPositionChange={setUserPosition}
-          onGpsStatusChange={setGpsStatus}
-          onRouteFound={handleRouteFound}
-        />
+        <div className="map-wrapper-outer">
+          <MapView
+            ref={mapRef}
+            reports={filteredReports}
+            routeMode={routeMode}
+            onMapClick={handleMapClick}
+            onUserPositionChange={handleUserPositionChange}
+            onGpsStatusChange={setGpsStatus}
+            onRouteFound={handleRouteFound}
+          />
+
+          {/* FAB de reporte rápido con cámara */}
+          <div className="quick-report-fab-container">
+            <button
+              className="quick-report-fab"
+              onClick={handleQuickPhotoClick}
+              title={
+                gpsReady
+                  ? "Fotografiar incidente en mi ubicación"
+                  : "Esperando señal GPS…"
+              }
+              aria-label="Fotografiar incidente"
+            >
+              <span className="fab-icon">📸</span>
+              <span className="fab-label">
+                {gpsReady ? "Reportar con cámara" : "Buscando GPS…"}
+              </span>
+            </button>
+          </div>
+
+          {/* Asistente de voz */}
+          <VoiceChatbot
+            userLat={userPosition[0]}
+            userLng={userPosition[1]}
+            gpsReady={gpsReady}
+          />
+        </div>
       </div>
 
       {pendingReport && (
         <ReportModal
           pending={pendingReport}
-          onClose={() => setPendingReport(null)}
+          onClose={handleReportClose}
           onSubmit={handleReportSubmit}
+          initialPhoto={quickPhoto}
         />
       )}
 
@@ -213,6 +282,13 @@ export function MapClient() {
         <ReportDetailModal
           report={selectedReport}
           onClose={() => setSelectedReport(null)}
+        />
+      )}
+
+      {cameraOpen && (
+        <CameraModal
+          onCapture={handleCameraCapture}
+          onClose={handleCameraClose}
         />
       )}
     </div>

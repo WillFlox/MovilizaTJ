@@ -28,7 +28,7 @@ export function RoutePanel({ routeState, onModeChange, onClear }: RoutePanelProp
   const { destination, distance, duration, barriersOnRoute, mode, warning } =
     routeState;
 
-  const bufferLabel = mode === "safest" ? "150 m" : "80 m";
+  const bufferLabel = mode === "safest" ? "50 m" : "30 m";
   const hasBarriers = barriersOnRoute.length > 0;
 
   const altaCount = barriersOnRoute.filter((b) => b.severidad === "alta").length;

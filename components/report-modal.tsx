@@ -10,15 +10,18 @@ type ReportModalProps = {
   pending: { latitude: number; longitude: number };
   onClose: () => void;
   onSubmit: (payload: ReportSubmitPayload) => Promise<void>;
+  initialPhoto?: File | null;
 };
 
-export function ReportModal({ pending, onClose, onSubmit }: ReportModalProps) {
+export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: ReportModalProps) {
   const [tipo, setTipo] = useState<BarrierType>(BARRIER_TYPES[0].value);
   const [descripcion, setDescripcion] = useState("");
   const [severidad, setSeveridad] =
     useState<ReportSubmitPayload["severidad"]>("media");
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<File | null>(initialPhoto ?? null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(
+    initialPhoto ? URL.createObjectURL(initialPhoto) : null
+  );
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

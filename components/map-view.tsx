@@ -92,6 +92,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         const routeColor = isSafest ? "#10b981" : "#2563eb";
 
         const control = L.Routing.control({
+          router: L.Routing.osrmv1({ profile: "walking" }),
           waypoints: [
             L.latLng(userPositionRef.current[0], userPositionRef.current[1]),
             L.latLng(lat, lng)
@@ -102,7 +103,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           addWaypoints: false,
           draggableWaypoints: false,
           routeWhileDragging: false,
-          createMarker: () => null
+          createMarker: () => null,
+          show: false
         }).addTo(map) as RoutingControl;
 
         // leaflet-routing-machine dispara "routesfound", no "routefound"

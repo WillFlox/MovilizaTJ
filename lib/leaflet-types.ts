@@ -1,5 +1,11 @@
 export type RoutingNamespace = {
   control: (options: object) => import("leaflet").Control;
+  osrmv1: (options?: { profile?: string; serviceUrl?: string }) => {
+    route: (
+      waypoints: unknown[],
+      callback: (err: unknown, routes: unknown[]) => void
+    ) => void;
+  };
 };
 
 export type LeafletLike = {

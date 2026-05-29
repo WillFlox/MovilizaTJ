@@ -1891,3 +1891,657 @@ body {
 .rd-close-full:hover {
   background: #e2e8f0;
 }
+
+/* ════════════════════════════════════════════
+   FAB — Reporte rápido con cámara
+   ════════════════════════════════════════════ */
+
+.map-wrapper-outer {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-wrapper-outer > .map-wrapper {
+  flex: 1;
+  height: 100%;
+}
+
+.quick-report-fab-container {
+  position: absolute;
+  bottom: 28px;
+  right: 24px;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.quick-report-fab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #10b981);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow:
+    0 8px 28px rgba(37, 99, 235, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.quick-report-fab:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow:
+    0 14px 36px rgba(37, 99, 235, 0.42),
+    0 4px 12px rgba(0, 0, 0, 0.14);
+}
+
+.quick-report-fab:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+.fab-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fab-label {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+/* ════════════════════════════════════════════
+   MODAL DE CÁMARA EN TIEMPO REAL
+   ════════════════════════════════════════════ */
+
+.camera-modal-card {
+  background: #0f172a;
+  border-radius: 24px;
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+  box-shadow: 0 32px 72px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #f1f5f9;
+}
+
+.camera-modal-card .modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.camera-modal-card .modal-header h3 {
+  color: #f1f5f9;
+  font-size: 15px;
+}
+
+.camera-modal-card .modal-close {
+  color: #94a3b8;
+}
+
+.camera-modal-card .modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+/* Video en vivo */
+.camera-live-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.camera-video-wrapper {
+  position: relative;
+  background: #000;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.camera-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 2;
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.3s ease;
+}
+
+/* Foto capturada */
+.camera-preview-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.camera-snapshot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+/* Botones de acción de cámara */
+.camera-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  gap: 12px;
+  background: #0f172a;
+}
+
+.camera-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex: none;
+  min-width: 80px;
+  font-size: 13px;
+}
+
+.camera-actions .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.camera-actions .btn-primary {
+  flex: 1;
+  font-size: 14px;
+  padding: 12px;
+}
+
+.camera-flip-btn {
+  min-width: 80px;
+}
+
+/* Botón disparador (obturador circular) */
+.btn-capture {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 3px solid rgba(255, 255, 255, 0.6);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+  position: relative;
+}
+
+.btn-capture:hover:not(:disabled) {
+  transform: scale(1.06);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-capture:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.btn-capture:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-capture-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: block;
+}
+
+/* Error de cámara */
+.camera-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  color: #fca5a5;
+}
+
+.camera-error p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+
+.camera-error .btn-primary {
+  min-width: 120px;
+}
+
+@media (max-width: 768px) {
+  .quick-report-fab-container {
+    bottom: 18px;
+    right: 16px;
+    left: 16px;
+    align-items: center;
+  }
+
+  .quick-report-fab {
+    width: 100%;
+    justify-content: center;
+    padding: 16px 20px;
+    font-size: 15px;
+    border-radius: 18px;
+  }
+
+  .fab-icon {
+    font-size: 22px;
+  }
+}
+
+/* ════════════════════════════════════════════
+   ASISTENTE DE VOZ (VoiceChatbot)
+   ════════════════════════════════════════════ */
+
+.vchat-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Botón flotante de apertura — esquina inferior izquierda del mapa */
+.vchat-fab {
+  position: absolute;
+  bottom: 28px;
+  left: 24px;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow:
+    0 8px 28px rgba(124, 58, 237, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.vchat-fab:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow:
+    0 14px 36px rgba(124, 58, 237, 0.46),
+    0 4px 12px rgba(0, 0, 0, 0.14);
+}
+
+.vchat-fab:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+.vchat-fab-label {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+/* Panel del chatbot */
+.vchat-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  z-index: 900;
+  width: min(380px, calc(100vw - 48px));
+  max-height: min(520px, calc(100vh - 180px));
+  background: #fff;
+  border-radius: 22px;
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.18),
+    0 4px 16px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid var(--border);
+}
+
+/* Header */
+.vchat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.vchat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vchat-header-avatar {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.vchat-header-title {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.vchat-header-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  opacity: 0.85;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.vchat-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.vchat-status-dot--rec {
+  background: #f87171;
+  animation: pulseGlow 1s infinite ease-out;
+}
+
+.vchat-status-dot--proc {
+  background: #fbbf24;
+  animation: pulseGlow 1.2s infinite ease-out;
+}
+
+.vchat-status-dot--speak {
+  background: #34d399;
+  animation: pulseGlow 1.5s infinite ease-out;
+}
+
+.vchat-gps-pill {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.vchat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vchat-icon-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.vchat-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Historial de mensajes */
+.vchat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.vchat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.vchat-empty-icon {
+  font-size: 36px;
+}
+
+.vchat-empty p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.vchat-hint {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  margin-top: 4px;
+}
+
+.vchat-hint kbd {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--text-main);
+}
+
+/* Burbuja de mensaje */
+.vchat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  animation: slideIn 0.18s ease-out;
+}
+
+.vchat-msg--user {
+  flex-direction: row-reverse;
+}
+
+.vchat-msg-avatar {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.vchat-msg-text {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 9px 13px;
+  border-radius: 16px;
+  max-width: 82%;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.vchat-msg--user .vchat-msg-text {
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.vchat-msg--assistant .vchat-msg-text {
+  background: #f1f5f9;
+  color: var(--text-main);
+  border-bottom-left-radius: 4px;
+}
+
+/* Error */
+.vchat-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fee2e2;
+  border-top: 1px solid #fca5a5;
+  font-size: 12px;
+  color: #991b1b;
+  flex-shrink: 0;
+}
+
+.vchat-error button {
+  background: none;
+  border: none;
+  color: #991b1b;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Controles (micrófono) */
+.vchat-controls {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.vchat-mic {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+}
+
+.vchat-mic:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.38);
+}
+
+.vchat-mic--recording {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+  animation: recPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recPulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35); }
+  50% { box-shadow: 0 4px 24px rgba(220, 38, 38, 0.6); }
+}
+
+.vchat-mic--processing {
+  background: #f1f5f9;
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: default;
+  box-shadow: none;
+}
+
+.vchat-mic--speaking {
+  background: linear-gradient(135deg, #059669, #10b981);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+/* Punto rojo de grabación */
+.vchat-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+  animation: recBlink 1s step-end infinite;
+}
+
+@keyframes recBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* Spinner de carga */
+.vchat-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive móvil */
+@media (max-width: 768px) {
+  .vchat-fab {
+    bottom: 18px;
+    left: 16px;
+    padding: 14px 18px;
+  }
+
+  .vchat-panel {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 70vh;
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+  }
+}

@@ -4,7 +4,8 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
-  useRef
+  useRef,
+  useState
 } from "react";
 import { BARRIER_ICONS, TIJUANA_CENTER } from "@/lib/constants";
 import type { LeafletLike, MapViewHandle } from "@/lib/leaflet-types";
@@ -27,16 +28,20 @@ type MapViewProps = {
 };
 
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(
-  function MapView(
-    {
-      reports,
-      onMapClick,
-      onUserPositionChange,
-      onGpsStatusChange,
-      onRouteRequest
-    },
-    ref
-  ) {
+  function MapView(props, ref) {
+    // Guardamos todos los callbacks en refs para que nunca causen
+    // que el efecto de inicialización del mapa se destruya y recree.
+    const onMapClickRef = useRef(props.onMapClick);
+    const onUserPositionChangeRef = useRef(props.onUserPositionChange);
+    const onGpsStatusChangeRef = useRef(props.onGpsStatusChange);
+    const onRouteRequestRef = useRef(props.onRouteRequest);
+
+    // Actualizamos las refs en cada render sin re-ejecutar efectos.
+    onMapClickRef.current = props.onMapClick;
+    onUserPositionChangeRef.current = props.onUserPositionChange;
+    onGpsStatusChangeRef.current = props.onGpsStatusChange;
+    onRouteRequestRef.current = props.onRouteRequest;
+
     const leafletRef = useRef<LeafletLike | null>(null);
     const mapInstanceRef = useRef<LeafletMap | null>(null);
     const userMarkerRef = useRef<Marker | null>(null);
@@ -45,7 +50,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     const barriersLayerRef = useRef<LayerGroup | null>(null);
     const userPositionRef = useRef<[number, number]>(TIJUANA_CENTER);
     const watchIdRef = useRef<number | null>(null);
-    const mapReadyRef = useRef(false);
+
+    // Estado (no ref) para que el efecto de marcadores se re-ejecute
+    // cuando el mapa termina de inicializarse.
+    const [mapReady, setMapReady] = useState(false);
 
     useImperativeHandle(ref, () => ({
       drawRoute(lat: number, lng: number, label?: string) {
@@ -71,7 +79,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           createMarker: () => null
         }).addTo(map);
 
-        const warning = onRouteRequest(lat, lng, label);
+        const warning = onRouteRequestRef.current(lat, lng, label);
 
         L.marker([lat, lng])
           .addTo(map)
@@ -83,10 +91,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
       }
     }));
 
+    // Re-dibuja marcadores de barreras cuando reports cambia O cuando
+    // el mapa termina de estar listo (mapReady pasa a true).
     useEffect(() => {
       const map = mapInstanceRef.current;
       const L = leafletRef.current;
-      if (!map || !L || !mapReadyRef.current) return;
+      if (!mapReady || !map || !L) return;
 
       if (barriersLayerRef.current) {
         barriersLayerRef.current.clearLayers();
@@ -94,7 +104,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         barriersLayerRef.current = L.layerGroup().addTo(map);
       }
 
-      reports.forEach((report) => {
+      props.reports.forEach((report) => {
         const icon = BARRIER_ICONS[report.tipo] ?? "📍";
         const severityColor =
           report.severidad === "alta"
@@ -129,8 +139,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           .bindPopup(popupContent)
           .addTo(barriersLayerRef.current!);
       });
-    }, [reports]);
+    }, [props.reports, mapReady]);
 
+    // Inicialización del mapa — solo se ejecuta UNA VEZ gracias al array vacío.
+    // Los callbacks se acceden via ref, así no causan re-inicialización.
     useEffect(() => {
       let cancelled = false;
 
@@ -170,30 +182,40 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         }).addTo(map);
 
         map.on("click", (event) => {
-          onMapClick(
+          onMapClickRef.current(
             Number(event.latlng.lat.toFixed(5)),
             Number(event.latlng.lng.toFixed(5))
           );
         });
 
-        mapReadyRef.current = true;
         setTimeout(() => map.invalidateSize(), 400);
-        startGpsTracking(map, L);
+
+        if (!cancelled) {
+          setMapReady(true);
+        }
+
+        startGpsTracking(map, L, cancelled);
       }
 
-      function startGpsTracking(map: LeafletMap, L: LeafletLike) {
+      function startGpsTracking(
+        map: LeafletMap,
+        L: LeafletLike,
+        cancelledRef: boolean
+      ) {
         if (!("geolocation" in navigator)) {
-          onGpsStatusChange("GPS no soportado");
+          onGpsStatusChangeRef.current("GPS no soportado");
           return;
         }
 
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
+            if (cancelledRef) return;
+
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             userPositionRef.current = [lat, lng];
-            onUserPositionChange([lat, lng]);
-            onGpsStatusChange("📍 GPS activo");
+            onUserPositionChangeRef.current([lat, lng]);
+            onGpsStatusChangeRef.current("📍 GPS activo");
 
             const customUserIcon: DivIcon = L.divIcon({
               className: "user-pulse-marker",
@@ -217,7 +239,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
             coverageCircleRef.current?.setLatLng([lat, lng]);
             syncUserLocation(lat, lng).catch(() => null);
           },
-          () => onGpsStatusChange("⚠️ Ubicación fija (TJ)"),
+          () => onGpsStatusChangeRef.current("⚠️ Ubicación fija (TJ)"),
           { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
         );
       }
@@ -228,12 +250,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         cancelled = true;
         if (watchIdRef.current !== null) {
           navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
         }
         mapInstanceRef.current?.remove();
         mapInstanceRef.current = null;
-        mapReadyRef.current = false;
+        userMarkerRef.current = null;
+        barriersLayerRef.current = null;
+        setMapReady(false);
       };
-    }, [onMapClick, onGpsStatusChange, onUserPositionChange, onRouteRequest]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
       <main className="map-wrapper">

@@ -10,11 +10,13 @@ import { ReportDetailModal } from "@/components/report-detail-modal";
 import { CameraModal } from "@/components/camera-modal";
 import { VoiceChatbot } from "@/components/voice-chatbot";
 import { ProximityToast } from "@/components/proximity-toast";
+import { RouteBarriersToast } from "@/components/route-barriers-toast";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import { useReports } from "@/hooks/use-reports";
 import { useAccessibilityProfile } from "@/hooks/use-accessibility-profile";
 import { useProximityPrompt } from "@/hooks/use-proximity-prompt";
 import { submitReport } from "@/lib/api-client";
-import { distanceMeters, getBarriersOnRoute } from "@/lib/geo";
+import { computeDetourWaypoints, distanceMeters, getBarriersOnRoute } from "@/lib/geo";
 import { TIJUANA_CENTER } from "@/lib/constants";
 import type { MapViewHandle } from "@/lib/leaflet-types";
 import type { FilterState } from "@/components/filter-bar";
@@ -44,7 +46,7 @@ const EMPTY_ROUTE_STATE: RouteState = {
   distance: null,
   duration: null,
   barriersOnRoute: [],
-  mode: "fastest"
+  mode: "safest"
 };
 
 export function MapClient() {
@@ -58,7 +60,16 @@ export function MapClient() {
   const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
   const [quickPhoto, setQuickPhoto] = useState<File | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [routeMode, setRouteMode] = useState<RouteMode>("fastest");
+  const [quickCapture, setQuickCapture] = useState<{
+    file: File;
+    latitude: number;
+    longitude: number;
+    previewUrl: string;
+  } | null>(null);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const [quickSubmitted, setQuickSubmitted] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [routeMode, setRouteMode] = useState<RouteMode>("safest");
   const [routeState, setRouteState] = useState<RouteState>(EMPTY_ROUTE_STATE);
   const [filters, setFilters] = useState<FilterState>({
     tipos: [],
@@ -69,6 +80,8 @@ export function MapClient() {
   const [gpsReady, setGpsReady] = useState(false);
   const [toastResolving, setToastResolving] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [routeBarriersDismissed, setRouteBarriersDismissed] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const lastRouteRef = useRef<{ lat: number; lng: number; label: string } | null>(null);
 
@@ -115,6 +128,11 @@ export function MapClient() {
       .sort((a, b) => a.distance_m - b.distance_m);
   }, [filteredReports, userPosition, nearbyRadius]);
 
+  // Marcar mapa como listo cuando GPS responde
+  useEffect(() => {
+    if (gpsReady && !loading) setMapLoaded(true);
+  }, [gpsReady, loading]);
+
   const handleUserPositionChange = useCallback(
     (pos: [number, number]) => {
       setUserPosition(pos);
@@ -123,11 +141,26 @@ export function MapClient() {
     []
   );
 
-  const handleMapClick = useCallback(
-    (latitude: number, longitude: number) => {
-      setPendingReport({ latitude, longitude });
+  /**
+   * Para el modo "safest", calcula waypoints de desvío alrededor de las
+   * barreras con severidad "alta" o "media" que caen cerca de la línea
+   * directa inicio→destino.  En modo "fastest" devuelve undefined.
+   */
+  const buildAvoidPoints = useCallback(
+    (destLat: number, destLng: number): [number, number][] | undefined => {
+      if (routeMode !== "safest") return undefined;
+      // Solo evitar barreras de severidad alta; las de media se muestran como
+      // advertencia en el toast pero no fuerzan desvíos (evita rutas erráticas)
+      const toAvoid = reports.filter((r) => r.severidad === "alta");
+      if (toAvoid.length === 0) return undefined;
+      const pts = computeDetourWaypoints(
+        userPosition[0], userPosition[1],
+        destLat, destLng,
+        toAvoid
+      );
+      return pts.length > 0 ? pts : undefined;
     },
-    []
+    [routeMode, reports, userPosition]
   );
 
   const handleQuickPhotoClick = useCallback(() => {
@@ -137,12 +170,53 @@ export function MapClient() {
   const handleCameraCapture = useCallback(
     (file: File) => {
       const [latitude, longitude] = userPosition;
-      setQuickPhoto(file);
       setCameraOpen(false);
-      setPendingReport({ latitude, longitude });
+      setQuickCapture({
+        file,
+        latitude,
+        longitude,
+        previewUrl: URL.createObjectURL(file)
+      });
     },
     [userPosition]
   );
+
+  const handleQuickSubmit = useCallback(async () => {
+    if (!quickCapture) return;
+    setQuickSubmitting(true);
+    setQuickError(null);
+    try {
+      const saved = await submitReport(
+        { latitude: quickCapture.latitude, longitude: quickCapture.longitude },
+        { tipo: "obstaculo_general", descripcion: "", severidad: "media", photo: quickCapture.file }
+      );
+      addReport(saved as ReportRecord);
+      setQuickSubmitted(true);
+      setTimeout(() => {
+        URL.revokeObjectURL(quickCapture.previewUrl);
+        setQuickCapture(null);
+        setQuickSubmitted(false);
+      }, 2000);
+    } catch {
+      setQuickError("No se pudo enviar. Intenta de nuevo.");
+    } finally {
+      setQuickSubmitting(false);
+    }
+  }, [quickCapture, addReport]);
+
+  const handleQuickManual = useCallback(() => {
+    if (!quickCapture) return;
+    setQuickPhoto(quickCapture.file);
+    setPendingReport({ latitude: quickCapture.latitude, longitude: quickCapture.longitude });
+    URL.revokeObjectURL(quickCapture.previewUrl);
+    setQuickCapture(null);
+  }, [quickCapture]);
+
+  const handleQuickClose = useCallback(() => {
+    if (quickCapture) URL.revokeObjectURL(quickCapture.previewUrl);
+    setQuickCapture(null);
+    setQuickError(null);
+  }, [quickCapture]);
 
   const handleCameraClose = useCallback(() => {
     setCameraOpen(false);
@@ -170,6 +244,9 @@ export function MapClient() {
         barriersOnRoute,
         mode: routeMode
       });
+      if (barriersOnRoute.length > 0) {
+        setRouteBarriersDismissed(false);
+      }
     },
     [reports, routeMode, getRouteWarning]
   );
@@ -177,8 +254,12 @@ export function MapClient() {
   useEffect(() => {
     if (lastRouteRef.current) {
       const { lat, lng, label } = lastRouteRef.current;
-      mapRef.current?.drawRoute(lat, lng, label);
+      const avoidPoints = buildAvoidPoints(lat, lng);
+      mapRef.current?.drawRoute(lat, lng, label, avoidPoints);
     }
+  // buildAvoidPoints cambia cuando routeMode/reports/userPosition cambian,
+  // pero solo queremos redibujar al cambiar el modo de ruta.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeMode]);
 
   const handlePlaceSelect = useCallback(
@@ -197,9 +278,10 @@ export function MapClient() {
         warning: null,
         mode: routeMode
       }));
-      mapRef.current?.drawRoute(place.latitude, place.longitude, place.name);
+      const avoidPoints = buildAvoidPoints(place.latitude, place.longitude);
+      mapRef.current?.drawRoute(place.latitude, place.longitude, place.name, avoidPoints);
     },
-    [routeMode]
+    [routeMode, buildAvoidPoints]
   );
 
   const handleModeChange = useCallback((mode: RouteMode) => {
@@ -211,6 +293,7 @@ export function MapClient() {
     lastRouteRef.current = null;
     mapRef.current?.clearRoute();
     setRouteState(EMPTY_ROUTE_STATE);
+    setRouteBarriersDismissed(false);
   }, []);
 
   const handleReportSubmit = useCallback(
@@ -272,7 +355,8 @@ export function MapClient() {
     }));
 
     // Dibujar usando el mismo sistema existente (OSRM, modo actual, onRouteFound)
-    mapRef.current?.drawRoute(destLat, destLng, ruta.destino);
+    const avoidPoints = buildAvoidPoints(destLat, destLng);
+    mapRef.current?.drawRoute(destLat, destLng, ruta.destino, avoidPoints);
 
     // Pintar obstáculos de voz encima de la ruta
     if (ruta.obstaculos && ruta.obstaculos.length > 0) {
@@ -280,27 +364,44 @@ export function MapClient() {
         mapRef.current?.paintVoiceObstacles(ruta.obstaculos!);
       }, 400);
     }
-  }, [routeMode]);
+  }, [routeMode, buildAvoidPoints]);
 
   const handleVoiceObstacles = useCallback((obstaculos: VoiceRouteObstacle[]) => {
     mapRef.current?.paintVoiceObstacles(obstaculos);
   }, []);
 
+  // La ruta está siendo calculada: destino elegido pero distancia aún nula
+  const routeCalculating =
+    routeState.destination !== null && routeState.distance === null;
+
   return (
     <div className="app-shell app-shell--map">
+      <OnboardingModal onDone={() => {}} />
+
       {/* Mapa fullscreen */}
       <div className="map-wrapper-outer">
+        {/* Overlay de carga inicial */}
+        {!mapLoaded && (
+          <div className="map-loading-overlay" aria-label="Cargando mapa" aria-live="polite">
+            <div className="map-loading-spinner" aria-hidden />
+            <span className="map-loading-text">
+              {gpsReady ? "Cargando reportes…" : "Buscando señal GPS…"}
+            </span>
+          </div>
+        )}
+
         <MapView
           ref={mapRef}
           reports={filteredReports}
           routeMode={routeMode}
-          onMapClick={handleMapClick}
           onUserPositionChange={handleUserPositionChange}
           onGpsStatusChange={setGpsStatus}
           onRouteFound={handleRouteFound}
         />
 
-        {/* ── Barra superior (desktop: flotante; móvil: barra fija) ── */}
+        {/* ── Top bar (logo + botones) ──
+             Desktop: hijos absolutos flotantes
+             Móvil: barra fija, fila horizontal ── */}
         <div className="map-top-bar">
           <div className="map-overlay-logo">
             <Image
@@ -312,19 +413,6 @@ export function MapClient() {
               priority
             />
           </div>
-
-          {/* Búsqueda — ocupa el centro en desktop, va aquí en móvil */}
-          <div className="map-overlay-search">
-            <div className="map-search-inner">
-              <PlacesSearch
-                userLat={userPosition[0]}
-                userLng={userPosition[1]}
-                onSelect={handlePlaceSelect}
-              />
-              <span className="map-search-icon">🔍</span>
-            </div>
-          </div>
-
           <div className="map-overlay-actions">
             <button
               className="map-action-btn"
@@ -344,6 +432,64 @@ export function MapClient() {
             </button>
           </div>
         </div>
+
+        {/* ── Barra de búsqueda ──
+             Desktop: centrada/flotante; Móvil: fila debajo del top bar ── */}
+        <div className="map-overlay-search">
+          <div className="map-search-inner">
+            <PlacesSearch
+              userLat={userPosition[0]}
+              userLng={userPosition[1]}
+              onSelect={handlePlaceSelect}
+            />
+            <span className="map-search-icon">🔍</span>
+          </div>
+        </div>
+
+        {/* Tarjeta rápida post-captura */}
+        {quickCapture && (
+          <div className="quick-capture-card">
+            {quickSubmitted ? (
+              <div className="quick-capture-success">
+                <span className="quick-capture-success-icon">✓</span>
+                <p>¡Reporte enviado!</p>
+              </div>
+            ) : (
+              <>
+                <button
+                  className="quick-capture-close"
+                  onClick={handleQuickClose}
+                  aria-label="Cancelar"
+                >
+                  ✕
+                </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={quickCapture.previewUrl}
+                  alt="Foto capturada"
+                  className="quick-capture-photo"
+                />
+                <p className="quick-capture-title">📸 Foto capturada</p>
+                {quickError && <p className="quick-capture-error">{quickError}</p>}
+                <div className="quick-capture-actions">
+                  <button
+                    className="btn-primary quick-capture-btn"
+                    onClick={handleQuickSubmit}
+                    disabled={quickSubmitting}
+                  >
+                    {quickSubmitting ? "Enviando…" : "Enviar reporte"}
+                  </button>
+                  <button
+                    className="quick-capture-manual"
+                    onClick={handleQuickManual}
+                  >
+                    ✏️ Agregar datos manualmente
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* FAB cámara — esquina inferior derecha */}
         <div className="quick-report-fab-container">
@@ -365,6 +511,14 @@ export function MapClient() {
           onRouteReceived={handleVoiceRoute}
           onObstaclesReceived={handleVoiceObstacles}
         />
+
+        {/* Badge "Calculando ruta…" */}
+        {routeCalculating && (
+          <div className="route-calculating-badge" role="status" aria-live="polite">
+            <div className="map-loading-spinner" aria-hidden />
+            Calculando ruta…
+          </div>
+        )}
       </div>
 
       {/* Drawer lateral */}
@@ -429,6 +583,15 @@ export function MapClient() {
         <CameraModal
           onCapture={handleCameraCapture}
           onClose={handleCameraClose}
+        />
+      )}
+
+      {routeState.barriersOnRoute.length > 0 && !routeBarriersDismissed && (
+        <RouteBarriersToast
+          barriers={routeState.barriersOnRoute}
+          userLat={userPosition[0]}
+          userLng={userPosition[1]}
+          onDismiss={() => setRouteBarriersDismissed(true)}
         />
       )}
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BARRIER_ICONS, BARRIER_TYPES } from "@/lib/constants";
 import type { ProximityPrompt } from "@/hooks/use-proximity-prompt";
+
+const AUTO_COLLAPSE_MS = 5000; // se contrae si no hay interacción
+const AUTO_DISMISS_MS  = 60000; // desaparece silenciosamente si se ignora
 
 type Props = {
   prompt: ProximityPrompt;
@@ -20,6 +23,11 @@ export function ProximityToast({
   resolving = false
 }: Props) {
   const { report, distance_m } = prompt;
+  const [collapsed, setCollapsed] = useState(false);
+
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const icon = BARRIER_ICONS[report.tipo] ?? "📍";
   const barrierLabel =
     BARRIER_TYPES.find((t) => t.value === report.tipo)?.label ??
@@ -30,6 +38,44 @@ export function ProximityToast({
       ? `${Math.round(distance_m)} m`
       : `${(distance_m / 1000).toFixed(1)} km`;
 
+  // Arranca temporizador de colapso al montar
+  useEffect(() => {
+    collapseTimerRef.current = setTimeout(() => setCollapsed(true), AUTO_COLLAPSE_MS);
+    dismissTimerRef.current  = setTimeout(onDismiss, AUTO_DISMISS_MS);
+
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+      if (dismissTimerRef.current)  clearTimeout(dismissTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Al re-expandir, reinicia el temporizador de colapso
+  function expand() {
+    setCollapsed(false);
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = setTimeout(() => setCollapsed(true), AUTO_COLLAPSE_MS);
+  }
+
+  // Pill colapsada
+  if (collapsed) {
+    return (
+      <button
+        className="prox-pill"
+        onClick={expand}
+        aria-label={`Barrera cercana: ${barrierLabel}. Toca para ver opciones.`}
+      >
+        <span className="prox-pill-icon">{icon}</span>
+        <span className="prox-pill-text">
+          <span className="prox-pill-label">{barrierLabel}</span>
+          <span className="prox-pill-dist">{distLabel}</span>
+        </span>
+        <span className="prox-pill-chevron" aria-hidden>▲</span>
+      </button>
+    );
+  }
+
+  // Card expandida
   return (
     <div className="prox-toast" role="alert" aria-live="polite">
       <button

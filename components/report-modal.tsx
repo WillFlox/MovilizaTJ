@@ -14,10 +14,10 @@ type ReportModalProps = {
 };
 
 export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: ReportModalProps) {
-  const [tipo, setTipo] = useState<BarrierType>(BARRIER_TYPES[0].value);
+  const [tipo, setTipo] = useState<BarrierType | null>(null);
   const [descripcion, setDescripcion] = useState("");
   const [severidad, setSeveridad] =
-    useState<ReportSubmitPayload["severidad"]>("media");
+    useState<ReportSubmitPayload["severidad"] | null>(null);
   const [photo, setPhoto] = useState<File | null>(initialPhoto ?? null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     initialPhoto ? URL.createObjectURL(initialPhoto) : null
@@ -25,6 +25,7 @@ export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: Report
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,13 +59,31 @@ export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: Report
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await onSubmit({ tipo, descripcion, severidad, photo });
-      onClose();
+      await onSubmit({
+        tipo: tipo ?? "obstaculo_general",
+        descripcion,
+        severidad: severidad ?? "media",
+        photo
+      });
+      setSubmitted(true);
+      setTimeout(onClose, 1800);
     } catch {
       setSubmitError("No se pudo enviar el reporte. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-card modal-card--success" role="status" aria-live="polite">
+          <div className="report-success-icon" aria-hidden>✓</div>
+          <p className="report-success-title">¡Reporte enviado!</p>
+          <p className="report-success-sub">Gracias por contribuir a una ciudad más accesible.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -90,7 +109,7 @@ export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: Report
                 <button
                   key={item.value}
                   type="button"
-                  className={`barrier-chip${tipo === item.value ? " barrier-chip--active" : ""}`}
+                  className={`barrier-chip${tipo !== null && tipo === item.value ? " barrier-chip--active" : ""}`}
                   onClick={() => setTipo(item.value as BarrierType)}
                 >
                   <span>{item.icon}</span>
@@ -107,7 +126,7 @@ export function ReportModal({ pending, onClose, onSubmit, initialPhoto }: Report
                 <button
                   key={s}
                   type="button"
-                  className={`severity-chip severity-chip--${s}${severidad === s ? " severity-chip--active" : ""}`}
+                  className={`severity-chip severity-chip--${s}${severidad !== null && severidad === s ? " severity-chip--active" : ""}`}
                   onClick={() => setSeveridad(s)}
                 >
                   {s === "baja" ? "🟢 Baja" : s === "media" ? "🟡 Media" : "🔴 Alta"}

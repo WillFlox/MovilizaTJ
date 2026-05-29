@@ -40,7 +40,6 @@ function routePointsFromCoordinates(
 type MapViewProps = {
   reports: ReportRecord[];
   routeMode: RouteMode;
-  onMapClick: (latitude: number, longitude: number) => void;
   onUserPositionChange: (position: [number, number]) => void;
   onGpsStatusChange: (status: string) => void;
   onRouteFound: (data: RouteFoundData) => void;
@@ -49,13 +48,11 @@ type MapViewProps = {
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(
   function MapView(props, ref) {
     // Todos los callbacks en refs: nunca causan re-inicialización del mapa.
-    const onMapClickRef = useRef(props.onMapClick);
     const onUserPositionChangeRef = useRef(props.onUserPositionChange);
     const onGpsStatusChangeRef = useRef(props.onGpsStatusChange);
     const onRouteFoundRef = useRef(props.onRouteFound);
     const routeModeRef = useRef(props.routeMode);
 
-    onMapClickRef.current = props.onMapClick;
     onUserPositionChangeRef.current = props.onUserPositionChange;
     onGpsStatusChangeRef.current = props.onGpsStatusChange;
     onRouteFoundRef.current = props.onRouteFound;
@@ -75,7 +72,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
     const [mapReady, setMapReady] = useState(false);
 
     useImperativeHandle(ref, () => ({
-      drawRoute(lat: number, lng: number, label?: string) {
+      drawRoute(lat: number, lng: number, label?: string, avoidPoints?: [number, number][]) {
         const map = mapInstanceRef.current;
         const L = leafletRef.current;
         if (!map || !L) return;
@@ -92,10 +89,21 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
         const isSafest = routeModeRef.current === "safest";
         const routeColor = isSafest ? "#10b981" : "#2563eb";
 
+        const viaWaypoints = (avoidPoints ?? []).map(([wLat, wLng]) =>
+          L.latLng(wLat, wLng)
+        );
+
         const control = L.Routing.control({
-          router: L.Routing.osrmv1({ profile: "walking" }),
+          // routing.openstreetmap.de/routed-foot es el servidor OSRM público de
+          // FOSSGIS compilado exclusivamente para rutas peatonales (foot).
+          // project-osrm.org solo tiene el perfil "driving" disponible.
+          router: L.Routing.osrmv1({
+            serviceUrl: "https://routing.openstreetmap.de/routed-foot/route/v1",
+            profile: "driving"
+          }),
           waypoints: [
             L.latLng(userPositionRef.current[0], userPositionRef.current[1]),
+            ...viaWaypoints,
             L.latLng(lat, lng)
           ],
           lineOptions: {
@@ -291,13 +299,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
           opacity: 0.55
         }).addTo(map);
 
-        map.on("click", (event) => {
-          onMapClickRef.current(
-            Number(event.latlng.lat.toFixed(5)),
-            Number(event.latlng.lng.toFixed(5))
-          );
-        });
-
         setTimeout(() => map.invalidateSize(), 400);
 
         if (!cancelled) {
@@ -376,13 +377,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(
 
     return (
       <main className="map-wrapper">
-        <div className="map-helper">
-          <strong>MovilizaTJ</strong>
-          <span>
-            Haz clic en el mapa para reportar una barrera. Busca tu destino en
-            el panel para trazar una ruta accesible desde tu posición.
-          </span>
-        </div>
         <div id="map" />
       </main>
     );

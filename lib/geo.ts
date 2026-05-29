@@ -73,6 +73,91 @@ function pointToSegmentMeters(
  * Buffer recomendado: 30 m (ancho de acera + carril) para "Más corta",
  * 50 m para "Más segura".
  */
+/**
+ * Calcula waypoints de desvío para la ruta "más segura".
+ *
+ * Estrategia: para cada cluster de barreras sobre el trayecto, genera UN
+ * único waypoint desplazado ~150 m perpendicular a la línea directa
+ * (suficiente para alcanzar la calle paralela siguiente en Tijuana).
+ * Se elige el lado con menos barreras totales para minimizar interferencias.
+ *
+ * Limitaciones deliberadas que evitan rutas erráticas:
+ *  - Solo se desvía por barreras a ≤ 80 m de la línea directa.
+ *  - Un solo desvío por cada tramo de 250 m (no se acumulan zigzags).
+ *  - Máximo 4 waypoints de desvío en total.
+ */
+export function computeDetourWaypoints(
+  startLat: number, startLng: number,
+  destLat: number, destLng: number,
+  barriers: { latitude: number; longitude: number }[],
+  bufferMeters = 80,
+  offsetMeters = 150
+): [number, number][] {
+  const MAX_WAYPOINTS = 4;
+  const DEDUP_METERS  = 250;
+
+  const mPerDegLat = 111_320;
+  const cosLat = Math.cos(((startLat + destLat) / 2) * (Math.PI / 180));
+  const mPerDegLng = 111_320 * cosLat;
+
+  const dLatM = (destLat - startLat) * mPerDegLat;
+  const dLngM = (destLng - startLng) * mPerDegLng;
+  const lenM  = Math.sqrt(dLatM ** 2 + dLngM ** 2);
+  if (lenM < 1) return [];
+
+  // Dirección normalizada (metros)
+  const ry = dLatM / lenM;
+  const rx = dLngM / lenM;
+
+  // Vector perpendicular (rotación 90° CCW: izquierda de la marcha)
+  const perpLat = (-rx) / mPerDegLat;
+  const perpLng = ( ry) / mPerDegLng;
+
+  // --- Proyectar barreras sobre la línea directa ---
+  const candidates: { t: number; cross: number }[] = [];
+
+  for (const b of barriers) {
+    const bxM = (b.longitude - startLng) * mPerDegLng;
+    const byM = (b.latitude  - startLat) * mPerDegLat;
+
+    const t = (bxM * rx + byM * ry) / lenM;
+    if (t < 0.05 || t > 0.95) continue;
+
+    const projXm = t * lenM * rx;
+    const projYm = t * lenM * ry;
+    const dist   = Math.sqrt((bxM - projXm) ** 2 + (byM - projYm) ** 2);
+    if (dist > bufferMeters) continue;
+
+    const cross = rx * (byM - projYm) - ry * (bxM - projXm);
+    candidates.push({ t, cross });
+  }
+
+  if (candidates.length === 0) return [];
+
+  candidates.sort((a, b) => a.t - b.t);
+
+  // --- Deduplicar en clusters de DEDUP_METERS ---
+  const clusters: { t: number; cross: number }[] = [];
+  for (const c of candidates) {
+    const last = clusters[clusters.length - 1];
+    if (!last || (c.t - last.t) * lenM > DEDUP_METERS) {
+      clusters.push(c);
+    } else {
+      // Acumular el cross product para elegir lado mayoritario
+      last.cross += c.cross;
+    }
+  }
+
+  // --- Generar waypoints (máx MAX_WAYPOINTS) ---
+  return clusters.slice(0, MAX_WAYPOINTS).map(({ t, cross }) => {
+    // Desviar al lado contrario donde está la mayoría de barreras
+    const side: 1 | -1 = cross > 0 ? -1 : 1;
+    const lat = startLat + t * (destLat - startLat) + side * offsetMeters * perpLat;
+    const lng = startLng + t * (destLng - startLng) + side * offsetMeters * perpLng;
+    return [lat, lng] as [number, number];
+  });
+}
+
 export function getBarriersOnRoute<T extends { latitude: number; longitude: number }>(
   reports: T[],
   routePoints: [number, number][],
